@@ -37,3 +37,44 @@ export function createCompressorStream(): Transform {
     }
   })
 }
+
+export function createComprexiaMiddleware() {
+  return (req: any, res: any, next: any) => {
+    const originalJson = res.json.bind(res)
+    res.json = function (body: any) {
+      const enc = negotiateEncoding(req.headers && req.headers['accept-encoding'])
+      if (enc === 'cx') {
+        try {
+          const s = JSON.stringify(body)
+          const originalSize = Buffer.byteLength(s, 'utf8')
+          const out = compress(Buffer.from(s))
+          const compressedSize = out.length
+          const ratio = compressedSize / originalSize
+          res.setHeader('Content-Encoding', 'cx')
+          res.setHeader('X-Compression-Ratio', ratio.toFixed(3))
+          res.setHeader('X-Original-Size', String(originalSize))
+          res.setHeader('X-Compressed-Size', String(compressedSize))
+          return res.set('Content-Type', 'application/json').send(out)
+        } catch (_e) {
+          return originalJson(body)
+        }
+      }
+      return originalJson(body)
+    }
+    next()
+  }
+}
+
+export function compressionStatsMiddleware() {
+  return (_req: any, res: any, next: any) => {
+    const originalSend = res.send.bind(res)
+    res.send = function (body: any) {
+      if (res.getHeader && res.getHeader('Content-Encoding') === 'cx') {
+        originalSend(body)
+        return
+      }
+      return originalSend(body)
+    }
+    next()
+  }
+}

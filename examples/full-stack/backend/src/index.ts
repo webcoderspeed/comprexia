@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import { createComprexiaMiddleware } from './middleware/comprexia';
+import { createComprexiaMiddleware } from '@comprexia/cx';
 import { decompress } from '@comprexia/cx';
 import { jsonPlaceholderRouter } from './routes/jsonplaceholder';
 
