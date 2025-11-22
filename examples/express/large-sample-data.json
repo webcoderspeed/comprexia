@@ -1,0 +1,194 @@
+{
+  "metadata": {
+    "generatedAt": "2024-01-22T10:30:00.000Z",
+    "dataType": "ecommerce-analytics",
+    "version": "1.0.0"
+  },
+  "users": [
+    {
+      "userId": "user_001",
+      "username": "john_doe",
+      "email": "john.doe@example.com",
+      "profile": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "age": 30,
+        "address": {
+          "street": "123 Main Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10001",
+          "country": "United States"
+        },
+        "preferences": {
+          "theme": "dark",
+          "language": "en",
+          "currency": "USD",
+          "notifications": {
+            "email": true,
+            "push": true,
+            "sms": false
+          }
+        }
+      },
+      "orders": [
+        {
+          "orderId": "ORD_20240122_001",
+          "date": "2024-01-15",
+          "status": "delivered",
+          "totalAmount": 299.99,
+          "items": [
+            {
+              "productId": "PROD_1001",
+              "name": "Wireless Headphones",
+              "quantity": 1,
+              "price": 149.99,
+              "category": "electronics"
+            },
+            {
+              "productId": "PROD_1002", 
+              "name": "Phone Case",
+              "quantity": 2,
+              "price": 75.00,
+              "category": "accessories"
+            }
+          ],
+          "shipping": {
+            "address": {
+              "street": "123 Main Street",
+              "city": "New York",
+              "state": "NY",
+              "zipCode": "10001"
+            },
+            "carrier": "UPS",
+            "trackingNumber": "1Z999AA10123456784",
+            "status": "delivered"
+          },
+          "payment": {
+            "method": "credit_card",
+            "cardLast4": "1234",
+            "amount": 299.99,
+            "status": "completed"
+          }
+        }
+      ],
+      "activity": [
+        {
+          "type": "login",
+          "timestamp": "2024-01-22T10:15:30.000Z",
+          "ipAddress": "192.168.1.100",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        },
+        {
+          "type": "product_view", 
+          "timestamp": "2024-01-22T09:45:12.000Z",
+          "productId": "PROD_1003",
+          "productName": "Smart Watch",
+          "category": "electronics"
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "productId": "PROD_1001",
+      "name": "Wireless Headphones",
+      "description": "High-quality wireless headphones with noise cancellation and 30-hour battery life. Perfect for music lovers and professionals.",
+      "price": 149.99,
+      "originalPrice": 199.99,
+      "category": "electronics",
+      "subcategory": "audio",
+      "brand": "AudioTech",
+      "sku": "AUDIO_WH_1001",
+      "inStock": true,
+      "stockQuantity": 150,
+      "specifications": {
+        "connectivity": "Bluetooth 5.2",
+        "batteryLife": "30 hours",
+        "chargingTime": "2 hours",
+        "weight": "250g",
+        "color": "Black",
+        "features": ["Noise Cancellation", "Touch Controls", "Voice Assistant", "Foldable Design"]
+      },
+      "images": [
+        "https://example.com/images/products/1001_1.jpg",
+        "https://example.com/images/products/1001_2.jpg",
+        "https://example.com/images/products/1001_3.jpg"
+      ],
+      "reviews": {
+        "averageRating": 4.5,
+        "totalReviews": 234,
+        "ratingDistribution": {
+          "5": 120,
+          "4": 80,
+          "3": 20,
+          "2": 10,
+          "1": 4
+        }
+      },
+      "tags": ["wireless", "headphones", "audio", "bluetooth", "noise-cancellation"],
+      "metadata": {
+        "createdAt": "2023-11-15T00:00:00.000Z",
+        "updatedAt": "2024-01-20T08:30:00.000Z",
+        "seoTitle": "Wireless Headphones with Noise Cancellation - AudioTech",
+        "seoDescription": "Premium wireless headphones with advanced noise cancellation technology. 30-hour battery life and comfortable design."
+      }
+    }
+  ],
+  "analytics": {
+    "salesSummary": {
+      "totalRevenue": 125000.50,
+      "totalOrders": 892,
+      "averageOrderValue": 140.12,
+      "conversionRate": 3.2,
+      "topSellingProducts": [
+        {"productId": "PROD_1001", "name": "Wireless Headphones", "unitsSold": 156, "revenue": 23398.44},
+        {"productId": "PROD_1002", "name": "Phone Case", "unitsSold": 289, "revenue": 21675.00},
+        {"productId": "PROD_1003", "name": "Smart Watch", "unitsSold": 98, "revenue": 15680.00}
+      ]
+    },
+    "userMetrics": {
+      "totalUsers": 1250,
+      "newUsers": 89,
+      "returningUsers": 415,
+      "activeUsers": 723,
+      "userAcquisition": {
+        "organic": 345,
+        "direct": 198,
+        "social": 267,
+        "email": 156,
+        "paid": 284
+      }
+    },
+    "geographicDistribution": {
+      "regions": [
+        {"region": "North America", "users": 523, "revenue": 65230.50},
+        {"region": "Europe", "users": 387, "revenue": 42345.75},
+        {"region": "Asia", "users": 289, "revenue": 15423.25},
+        {"region": "Other", "users": 51, "revenue": 2001.00}
+      ]
+    }
+  },
+  "system": {
+    "apiVersion": "v2.1.0",
+    "environment": "production",
+    "deployedAt": "2024-01-01T00:00:00.000Z",
+    "uptime": "99.98%",
+    "responseTimes": {
+      "p50": 45,
+      "p95": 120,
+      "p99": 250,
+      "max": 450
+    },
+    "errorRates": {
+      "totalRequests": 125000,
+      "errors": 125,
+      "errorRate": "0.1%",
+      "commonErrors": [
+        {"code": 404, "count": 45, "endpoint": "/api/products/9999"},
+        {"code": 400, "count": 35, "endpoint": "/api/orders"},
+        {"code": 500, "count": 15, "endpoint": "/api/checkout"}
+      ]
+    }
+  }
+}

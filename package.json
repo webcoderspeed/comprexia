@@ -1,0 +1,72 @@
+{
+  "name": "@comprexia/cx",
+  "version": "0.1.0",
+  "description": "High-performance HTTP compression addon with new algorithm (prototype)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:release": "cmake-js compile --CDCMAKE_BUILD_TYPE=Release",
+    "compile": "cmake-js compile",
+    "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js",
+    "lint": "eslint . --ext .js,.ts --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .js,.ts --ignore-path .gitignore --fix",
+    "prepare": "tsc -p tsconfig.json",
+    "install": "cmake-js compile",
+    "example:express": "node examples/express/server.js",
+    "example:fastify": "node examples/fastify/server.js",
+    "bench": "node benchmarks/runner/index.js",
+    "benchmark": "node benchmarks/runner/index.js"
+  },
+  "files": [
+    "dist/**",
+    "src/**",
+    "include/**",
+    "node/**",
+    "CMakeLists.txt",
+    "README.md"
+  ],
+  "keywords": [
+    "compression",
+    "http",
+    "json",
+    "native-addon",
+    "c++",
+    "simd"
+  ],
+  "author": "WebCoderSpeed",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webcoderspeed/comprexia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/webcoderspeed/comprexia/issues"
+  },
+  "homepage": "https://github.com/webcoderspeed/comprexia#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "cmake-js": "^7.1.1",
+    "eslint": "^9.39.1",
+    "express": "^4.19.2",
+    "fastify": "^4.26.2",
+    "lz4": "^0.6.5",
+    "typescript": "^5.6.3",
+    "zstd-codec": "^0.1.3"
+  },
+  "dependencies": {
+    "node-addon-api": "^7.1.0",
+    "ws": "^8.18.3"
+  }
+}

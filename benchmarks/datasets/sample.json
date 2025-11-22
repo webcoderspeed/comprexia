@@ -1,0 +1,8 @@
+{
+  "user": { "id": 123, "name": "Alice", "email": "alice@example.com" },
+  "cart": [
+    { "sku": "ABC-123", "qty": 2, "price": 1999 },
+    { "sku": "XYZ-999", "qty": 1, "price": 4999 }
+  ],
+  "meta": { "ts": 1700000000, "ip": "127.0.0.1", "agent": "Mozilla/5.0" }
+}
