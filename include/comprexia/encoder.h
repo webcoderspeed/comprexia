@@ -16,4 +16,7 @@ std::vector<uint8_t> compress_utf8(const uint8_t* data, size_t len);
 // Advanced compression with all optimizations
 std::vector<uint8_t> compress_advanced(const uint8_t* data, size_t len);
 
+// Ultra-fast compression (reduced match search, lower ratio, higher speed)
+std::vector<uint8_t> compress_fast(const uint8_t* data, size_t len);
+
 }

@@ -17,6 +17,10 @@ export function compressAdvanced(input: Buffer): Buffer {
   return addon.compressAdvanced(input)
 }
 
+export function compressFast(input: Buffer): Buffer {
+  return addon.compressFast(input)
+}
+
 export function decompressAdvanced(input: Buffer): Buffer {
   return addon.decompressAdvanced(input)
 }
@@ -50,7 +54,8 @@ export function createCompressorStream(): Transform {
   })
 }
 
-export function createComprexiaMiddleware() {
+export function createComprexiaMiddleware(opts?: { level?: 'fast' | 'advanced' }) {
+  const level = opts?.level || 'fast'
   return (req: any, res: any, next: any) => {
     const originalJson = res.json.bind(res)
     res.json = function (body: any) {
@@ -59,7 +64,7 @@ export function createComprexiaMiddleware() {
         try {
           const s = JSON.stringify(body)
           const originalSize = Buffer.byteLength(s, 'utf8')
-          const out = compressAdvanced(Buffer.from(s))
+          const out = level === 'advanced' ? compressAdvanced(Buffer.from(s)) : compressFast(Buffer.from(s))
           const compressedSize = out.length
           const ratio = compressedSize / originalSize
           res.setHeader('Content-Encoding', 'cx')

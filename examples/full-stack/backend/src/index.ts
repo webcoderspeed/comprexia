@@ -25,8 +25,8 @@ app.use(morgan('combined'));
 // Standard compression (gzip)
 app.use(compression());
 
-// Comprexia compression middleware
-app.use(createComprexiaMiddleware());
+// Comprexia compression middleware (fast by default)
+app.use(createComprexiaMiddleware({ level: 'fast' }));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

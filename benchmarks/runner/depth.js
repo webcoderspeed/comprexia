@@ -1,4 +1,4 @@
-const { compress, decompress, compressAdvanced, decompressAdvanced } = require('../../dist/index.js')
+const { compress, decompress, compressAdvanced, decompressAdvanced, compressFast } = require('../../dist/index.js')
 const zlib = require('zlib')
 const { ZstdCodec } = require('zstd-codec')
 
@@ -80,7 +80,8 @@ async function run() {
       for (const [label, data] of cases) {
         console.log(`\nCase: ${label}`)
         if (label.startsWith('JSON')) {
-          measureSync('Comprexia', data, (b) => compressAdvanced(b), (c) => decompressAdvanced(c))
+          measureSync('Comprexia-Fast', data, (b) => compressFast(b), (c) => decompressAdvanced(c))
+          measureSync('Comprexia-Adv', data, (b) => compressAdvanced(b), (c) => decompressAdvanced(c))
         } else {
           measureSync('Comprexia', data, (b) => compress(b), (c) => decompress(c))
         }
