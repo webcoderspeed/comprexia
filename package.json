@@ -22,7 +22,8 @@
     "example:express": "node examples/express/server.js",
     "example:fastify": "node examples/fastify/server.js",
     "bench": "node benchmarks/runner/index.js",
-    "benchmark": "node benchmarks/runner/index.js"
+    "benchmark": "node benchmarks/runner/index.js",
+    "benchmark:depth": "node benchmarks/runner/depth.js"
   },
   "files": [
     "dist/**",
