@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { decompressToString } from '../../../../web/js/decoder'
 import './App.css'
 
 interface Post {
@@ -70,19 +71,15 @@ function App() {
     return new TextDecoder('utf-8').decode(new Uint8Array(data))
   }
 
-  const decodeCxOnServer = async (payload: ArrayBuffer) => {
-    const res = await apiClient.post<string>('/decode', payload, {
-      headers: { 'Content-Type': 'application/octet-stream' },
-      responseType: 'text',
-    })
-    return res.data
+  const decodeCxOnClient = async (payload: ArrayBuffer) => {
+    return decompressToString(payload)
   }
 
   const fetchDecoded = async <T,>(path: string) => {
     const response = await apiClient.get(path, { responseType: 'arraybuffer' })
     const contentEncoding = response.headers['content-encoding']
     if (contentEncoding === 'cx') {
-      const jsonStr = await decodeCxOnServer(response.data as ArrayBuffer)
+      const jsonStr = await decodeCxOnClient(response.data as ArrayBuffer)
       return JSON.parse(jsonStr) as ApiResponse<T>
     } else {
       const jsonStr = bufferToString(response.data as ArrayBuffer)

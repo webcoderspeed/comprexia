@@ -1,0 +1,1 @@
+export { decompressToString } from '../../web/js/decoder'

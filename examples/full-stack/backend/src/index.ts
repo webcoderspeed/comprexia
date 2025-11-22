@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import { createComprexiaMiddleware } from '@comprexia/cx';
-import { decompressAdvanced } from '@comprexia/cx';
 import { jsonPlaceholderRouter } from './routes/jsonplaceholder';
 
 const app = express();
@@ -32,8 +31,6 @@ app.use(createComprexiaMiddleware({ level: 'fast' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Raw body parser for Comprexia decode endpoint
-app.use('/api/decode', express.raw({ type: 'application/octet-stream', limit: '10mb' }));
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
@@ -47,19 +44,6 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use('/api', jsonPlaceholderRouter);
 
-// Comprexia decode endpoint
-app.post('/api/decode', (req, res) => {
-  try {
-    const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body as any);
-    const out = decompressAdvanced(buf);
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Encoding', 'identity');
-    return res.send(out);
-  } catch (e: any) {
-    console.error('Comprexia decode failed:', e);
-    return res.status(400).json({ error: 'Invalid compressed payload' });
-  }
-});
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

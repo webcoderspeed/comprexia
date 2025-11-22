@@ -9,6 +9,11 @@
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+    ,
+    "./web/decoder": {
+      "require": "./dist/node/web/decoder.js",
+      "types": "./dist/node/web/decoder.d.ts"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

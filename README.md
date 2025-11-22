@@ -1,204 +1,158 @@
 # Comprexia
 
-🚀 Next-generation compression library with JSON-aware optimization and Node.js N-API bindings
+High‑performance HTTP compression with a JSON‑aware codec and Node.js native bindings. Designed for modern APIs, real‑time streams, and structured payloads.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 [![C++20](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org/)
 
-Comprexia is a high-performance compression library built with C++20 and Node.js N-API bindings, designed specifically for modern web applications with exceptional JSON compression capabilities.
+## Why Comprexia
 
-## ✨ Features
+- Structured payload focus: JSON‑aware transforms target keys and layout for better efficiency on API responses
+- Performance options: `fast` for latency‑critical endpoints, `advanced` for better ratios
+- Streaming friendly: Native compressor stream integrates with chunked transfers and WebSocket
+- Simple integration: One middleware call to negotiate and emit `Content-Encoding: cx`
 
-- **JSON-Aware Compression**: Intelligent structural compression for JSON data
-- **High Performance**: Built with C++20 and SIMD optimizations
-- **Node.js Integration**: Seamless N-API bindings for JavaScript/TypeScript
-- **Multiple Use Cases**: API compression, file storage, database optimization, real-time streaming
-- **Production Ready**: Comprehensive examples and robust error handling
-
-## 📦 Installation
+## Install
 
 ```bash
 npm install @comprexia/cx
 ```
 
-## 🚀 Quick Start
+Native addon builds automatically on install. Requires a C++20 compiler and CMake.
 
-### Basic Usage
+## Quick Start
 
-```javascript
-const { compress, decompress } = require('@comprexia/cx');
+```ts
+import { compress, decompress } from '@comprexia/cx'
 
-// Compress data
-const originalData = 'Hello, Comprexia! This is a test string.';
-const compressed = compress(Buffer.from(originalData));
-
-// Decompress data
-const decompressed = decompress(compressed);
-console.log(decompressed.toString()); // Hello, Comprexia!...
+const src = Buffer.from('hello world')
+const c = compress(src)
+const d = decompress(c)
+console.log(d.toString())
 ```
 
-### API Response Compression
+## API Middleware (recommended)
 
-```javascript
-const express = require('express');
-const { compress, negotiateEncoding } = require('@comprexia/cx');
+```ts
+import express from 'express'
+import { createComprexiaMiddleware } from '@comprexia/cx'
 
-const app = express();
+const app = express()
 
-app.get('/api/data', (req, res) => {
-  const data = { message: 'Hello', items: [1, 2, 3] };
-  const jsonData = JSON.stringify(data);
-  
-  if (negotiateEncoding(req.headers['accept-encoding']) === 'cx') {
-    res.setHeader('Content-Encoding', 'cx');
-    res.send(compress(Buffer.from(jsonData)));
-  } else {
-    res.json(data);
+// Use fast for latency; switch to advanced where ratio matters
+app.use(createComprexiaMiddleware({ level: 'fast' }))
+
+app.get('/api/posts', (_req, res) => {
+  res.json({ success: true, data: [{ id: 1, title: 'hello' }] })
+})
+
+app.listen(3001)
+```
+
+Clients that send `Accept-Encoding: cx` receive compressed payloads with telemetry headers:
+
+- `Content-Encoding: cx`
+- `X-Compression-Ratio`
+- `X-Original-Size`
+- `X-Compressed-Size`
+
+## Frontend Decode (no server decode route)
+
+Use the provided browser decoder to decode `cx` payloads directly in the client.
+
+```ts
+import axios from 'axios'
+import { decompressToString } from '@comprexia/cx/web/decoder'
+
+const api = axios.create({
+  baseURL: '/api',
+  headers: { 'Accept-Encoding': 'cx' },
+})
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const res = await api.get(path, { responseType: 'arraybuffer' })
+  if (res.headers['content-encoding'] === 'cx') {
+    const jsonStr = decompressToString(res.data as ArrayBuffer)
+    return JSON.parse(jsonStr)
   }
-});
+  const text = new TextDecoder().decode(new Uint8Array(res.data as ArrayBuffer))
+  return JSON.parse(text)
+}
 ```
 
-## 📊 Performance
+Note: Browser decoder handles the base literal/match stream used by `fast`. If you opt into `advanced`, use the same decoder for the stream but be aware that extra JSON/UTF‑8 transforms may require WASM support in future versions.
 
-Comprexia delivers exceptional compression ratios, especially for structured data:
+## Streaming Example (Express)
 
-| Data Type | Original Size | Compressed Size | Ratio | Savings |
-|-----------|---------------|-----------------|-------|---------|
-| JSON API Response | 48.81 KB | 35.63 KB | 0.73x | 27% |
-| Text Files | 116 B | 110 B | 0.95x | 5% |
-| Database Records | 32.25 KB | 19.88 KB | 0.62x | 38% |
+```js
+const express = require('express')
+const { negotiateEncoding, createCompressorStream } = require('@comprexia/cx')
+const app = express()
 
-## 🎯 Use Cases
+app.get('/json', (req, res) => {
+  const enc = negotiateEncoding(req.headers['accept-encoding'])
+  const payload = Buffer.from(JSON.stringify({ ok: true, msg: 'hello' }))
+  if (enc === 'cx') {
+    res.setHeader('Content-Encoding', 'cx')
+    const c = createCompressorStream()
+    c.pipe(res)
+    c.end(payload)
+  } else {
+    res.type('application/json').send(payload)
+  }
+})
 
-### 1. API Response Compression
-Reduce bandwidth usage by compressing JSON API responses with Comprexia's structural optimization.
+app.listen(3000)
+```
 
-### 2. File Storage Optimization
-Compress files and directories with intelligent type detection and benchmarking.
+## API Reference
 
-### 3. Database Storage Reduction
-Optimize database storage with record-level compression for JSON documents.
+- `compress(input: Buffer): Buffer`
+- `decompress(input: Buffer): Buffer`
+- `compressFast(input: Buffer): Buffer`
+- `compressAdvanced(input: Buffer): Buffer`
+- `decompressAdvanced(input: Buffer): Buffer`
+- `createComprexiaMiddleware(opts?: { level?: 'fast' | 'advanced' })`
+- `createCompressorStream()`
+- `negotiateEncoding(acceptEncodingHeader?: string): 'cx' | 'identity'`
 
-### 4. Real-time Streaming
-Compress WebSocket messages and real-time data streams for bandwidth efficiency.
+## Benchmarks (snapshot)
 
-## 📁 Examples
+Large JSON (3k users):
 
-Explore comprehensive examples in the `/examples` directory:
+- Comprexia‑Fast: ratio ≈ 0.080, compress ≈ 1206 MB/s
+- Comprexia‑Adv: ratio ≈ 0.054, compress ≈ 150 MB/s
+- Gzip: ratio ≈ 0.028, compress ≈ 355 MB/s
+- Brotli: ratio ≈ 0.008, compress ≈ 250 MB/s
+- Zstd: ratio ≈ 0.010, compress ≈ 153 MB/s
 
-- **Express Server** (`/examples/express/`) - API response compression
-- **File Compressor** (`/examples/file-compressor.js`) - CLI tool for file compression
-- **Database Optimizer** (`/examples/database-storage.js`) - Database storage optimization
-- **Real-time Streaming** (`/examples/real-time-streaming.js`) - WebSocket compression
+Use `npm run benchmark:depth` to reproduce.
 
-## 🛠️ Development
+## When To Use Comprexia
 
-### Prerequisites
+- High‑traffic JSON APIs: prioritize latency and consistent decode with `fast`
+- Real‑time/WebSocket: streaming compressor integrates with chunked flows
+- Internal services with stable schemas: token interning improves efficiency
+- Hybrid stacks: negotiate `cx` for capable clients, fall back to gzip for others
 
-- Node.js 18+
-- C++20 compatible compiler (GCC 10+, Clang 10+, MSVC 2019+)
-- CMake 3.12+
+## When To Prefer Gzip/Brotli/Zstd
 
-### Building from Source
+- Static assets and general text where smallest size is the only goal
+- Broad client support without custom negotiation
+- Existing infra mandates specific codecs (e.g., CDN constraints)
+
+## Build From Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/comprexia.git
-cd comprexia
-
-# Install dependencies
 npm install
-
-# Build the project
-npm run build
-
-# Run tests
-npm test
+npm run build             # TypeScript
+npm run build:release     # Native addon (Release)
+npm test                  # Roundtrip tests
 ```
 
-### Project Structure
+Requires Node 18+, C++20 compiler, and CMake.
 
-```
-comprexia/
-├── src/
-│   ├── cx_core/           # C++20 core library
-│   │   ├── encoder.cpp    # Compression implementation
-│   │   ├── decoder.cpp    # Decompression implementation
-│   │   └── preprocessor.cpp # JSON optimization
-│   └── cx_bindings/       # Node.js N-API bindings
-│       └── addon.cc       # Native module entry point
-├── node/                   # TypeScript definitions
-│   └── index.ts
-├── examples/              # Comprehensive usage examples
-│   ├── express/           # Express.js server examples
-│   ├── file-compressor.js # CLI file compression tool
-│   ├── database-storage.js # Database optimization
-│   └── real-time-streaming.js # WebSocket streaming
-├── benchmarks/           # Performance benchmarks
-└── test/                 # Test suite
-```
+## License
 
-## 📈 Benchmarks
-
-Run performance benchmarks:
-
-```bash
-npm run benchmark
-```
-
-The benchmark suite compares Comprexia against other compression algorithms with various datasets.
-
-## 🤝 Contributing
-
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Style
-
-- **C++**: Follow Google C++ Style Guide
-- **JavaScript**: Use Prettier and ESLint
-- **Commit Messages**: Conventional Commits format
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Build failures**: Ensure you have C++20 compatible compiler
-2. **Module not found**: Run `npm run build` to compile native bindings
-3. **Performance issues**: Check benchmark results for expected ratios
-
-### Getting Help
-
-- Create an [Issue](https://github.com/your-username/comprexia/issues)
-- Check existing discussions
-- Review the examples directory
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with modern C++20 features and SIMD optimizations
-- Node.js N-API for seamless native integration
-- Inspired by modern compression research and real-world use cases
-
-## 🚀 Roadmap
-
-- [ ] WebAssembly build target
-- [ ] Python bindings
-- [ ] Redis module integration
-- [ ] Cloud storage optimizations
-- [ ] Machine learning-enhanced compression
-
----
-
-Made with ❤️ by the Comprexia Team
+MIT
