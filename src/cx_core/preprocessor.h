@@ -29,6 +29,10 @@ private:
     TOK_NULL         = 0xF9
   };
   
+  // Interned common string token base and count
+  static constexpr uint8_t TOK_COMMON_BASE = 0xE0;
+  static constexpr size_t TOK_COMMON_MAX = 16;
+  
   // Common JSON key/value interning
   static void intern_common_tokens(std::vector<uint8_t>& output, 
                                  const uint8_t* data, size_t len);

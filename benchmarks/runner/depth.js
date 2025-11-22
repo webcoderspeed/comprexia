@@ -1,4 +1,4 @@
-const { compress, decompress } = require('../../dist/index.js')
+const { compress, decompress, compressAdvanced, decompressAdvanced } = require('../../dist/index.js')
 const zlib = require('zlib')
 const { ZstdCodec } = require('zstd-codec')
 
@@ -79,7 +79,11 @@ async function run() {
       const simple = new zstd.Simple()
       for (const [label, data] of cases) {
         console.log(`\nCase: ${label}`)
-        measureSync('Comprexia', data, (b) => compress(b), (c) => decompress(c))
+        if (label.startsWith('JSON')) {
+          measureSync('Comprexia', data, (b) => compressAdvanced(b), (c) => decompressAdvanced(c))
+        } else {
+          measureSync('Comprexia', data, (b) => compress(b), (c) => decompress(c))
+        }
         measureSync('Gzip', data, (b) => zlib.gzipSync(b, { level: 6 }), (c) => zlib.gunzipSync(c))
         measureSync('Brotli', data, (b) => zlib.brotliCompressSync(b, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 } }), (c) => zlib.brotliDecompressSync(c))
         try {

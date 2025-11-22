@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import { createComprexiaMiddleware } from '@comprexia/cx';
-import { decompress } from '@comprexia/cx';
+import { decompressAdvanced } from '@comprexia/cx';
 import { jsonPlaceholderRouter } from './routes/jsonplaceholder';
 
 const app = express();
@@ -51,7 +51,7 @@ app.use('/api', jsonPlaceholderRouter);
 app.post('/api/decode', (req, res) => {
   try {
     const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body as any);
-    const out = decompress(buf);
+    const out = decompressAdvanced(buf);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Encoding', 'identity');
     return res.send(out);

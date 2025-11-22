@@ -9,6 +9,18 @@ export function decompress(input: Buffer): Buffer {
   return addon.decompress(input)
 }
 
+export function compressJson(input: Buffer): Buffer {
+  return addon.compressJson(input)
+}
+
+export function compressAdvanced(input: Buffer): Buffer {
+  return addon.compressAdvanced(input)
+}
+
+export function decompressAdvanced(input: Buffer): Buffer {
+  return addon.decompressAdvanced(input)
+}
+
 export function negotiateEncoding(header?: string): 'cx' | undefined {
   if (!header) return undefined
   return header.includes('cx') ? 'cx' : undefined
@@ -47,7 +59,7 @@ export function createComprexiaMiddleware() {
         try {
           const s = JSON.stringify(body)
           const originalSize = Buffer.byteLength(s, 'utf8')
-          const out = compress(Buffer.from(s))
+          const out = compressAdvanced(Buffer.from(s))
           const compressedSize = out.length
           const ratio = compressedSize / originalSize
           res.setHeader('Content-Encoding', 'cx')

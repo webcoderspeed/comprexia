@@ -11,7 +11,17 @@ std::vector<uint8_t> decompress(const uint8_t* data, size_t len) {
   size_t i = 0;
   while (i < len) {
     uint8_t h = data[i++];
-    if ((h & 0x80) == 0) {
+    if (h == 0xFF) {
+      if (i + 4 > len) break;
+      uint16_t mlen = static_cast<uint16_t>(data[i] | (static_cast<uint16_t>(data[i + 1]) << 8));
+      i += 2;
+      uint16_t dist = static_cast<uint16_t>(data[i] | (static_cast<uint16_t>(data[i + 1]) << 8));
+      i += 2;
+      size_t start = out.size() - dist;
+      for (size_t k = 0; k < mlen; ++k) {
+        out.push_back(out[start + k]);
+      }
+    } else if ((h & 0x80) == 0) {
       size_t count = h;
       if (i + count > len) count = len - i;
       out.insert(out.end(), data + i, data + i + count);
