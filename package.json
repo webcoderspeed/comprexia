@@ -1,6 +1,6 @@
 {
   "name": "@comprexia/cx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "High-performance HTTP compression addon with new algorithm (prototype)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,8 +8,7 @@
     ".": {
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
-    ,
+    },
     "./web/decoder": {
       "require": "./dist/node/web/decoder.js",
       "types": "./dist/node/web/decoder.d.ts"
