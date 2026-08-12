@@ -10,17 +10,18 @@
       "types": "./dist/index.d.ts"
     },
     "./web/decoder": {
-      "require": "./dist/node/web/decoder.js",
-      "types": "./dist/node/web/decoder.d.ts"
+      "require": "./dist/web/decoder.js",
+      "types": "./dist/web/decoder.d.ts"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:release": "cmake-js compile --CDCMAKE_BUILD_TYPE=Release",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "compile": "cmake-js compile",
     "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js",
-    "lint": "eslint . --ext .js,.ts --ignore-path .gitignore",
-    "lint:fix": "eslint . --ext .js,.ts --ignore-path .gitignore --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "prepare": "tsc -p tsconfig.json",
     "install": "cmake-js compile",
     "example:express": "node examples/express/server.js",
@@ -57,6 +58,9 @@
   "homepage": "https://github.com/webcoderspeed/comprexia#readme",
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
