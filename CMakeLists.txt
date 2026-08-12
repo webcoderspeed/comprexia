@@ -3,6 +3,7 @@ project(comprexia)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(comprexia SHARED
   src/cx_bindings/addon.cc
