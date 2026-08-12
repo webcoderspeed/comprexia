@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.10](https://github.com/webcoderspeed/comprexia/compare/v0.1.9...v0.1.10) (2026-08-12)
+
+### ⚡ Performance
+
+* **decoder:** copy matches with wildcopy into a slack-padded buffer ([6d875e7](https://github.com/webcoderspeed/comprexia/commit/6d875e7146e63b7d0d7f83ec1dfe779f9f0cd89e))
+
 ## [0.1.9](https://github.com/webcoderspeed/comprexia/compare/v0.1.8...v0.1.9) (2026-08-12)
 
 ### 📚 Documentation
