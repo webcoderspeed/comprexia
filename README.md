@@ -30,13 +30,14 @@
 Most compression libraries open with a benchmark that flatters them. This one
 opens with the benchmark that does not.
 
-**Comprexia v0.1 is a working prototype, not a production codec.** On realistic
-API payloads it is beaten by `gzip` at level 1 — which is built into Node, needs
-no native addon, and runs everywhere — on both ratio *and* compression speed.
-It is beaten far more decisively by LZ4. The numbers are in
-[Benchmarks](#benchmarks), reproducible with `npm run bench:honest`.
+**Comprexia is a working prototype, not yet a production codec.** As of 0.2.0 it
+compresses 2–6× faster than `gzip -1`, but `gzip -1` still produces *smaller*
+output on every dataset tested — and it is built into Node, needs no native
+addon, and runs everywhere. Until the ratio gap closes, that is the honest
+trade. The numbers are in [Benchmarks](#benchmarks), reproducible with
+`npm run bench:honest`.
 
-The earlier version of this README quoted 1206 MB/s. That figure came from a
+An earlier version of this README quoted 1206 MB/s. That figure came from a
 benchmark that concatenated one sample file until it reached 1 MB — near-pure
 repetition, which every LZ codec devours. It was not a lie so much as a
 measurement of nothing. It has been replaced.
@@ -102,43 +103,45 @@ npm run bench:honest
 
 | Codec | Ratio | Saved | Compress MB/s | Decompress MB/s |
 | --- | ---: | ---: | ---: | ---: |
-| comprexia-fast | 0.196 | 80.4% | 436 | 220 |
-| gzip-1 | 0.148 | 85.2% | 468 | 173 |
-| gzip-6 | 0.114 | 88.6% | 133 | 168 |
-| brotli-4 | 0.122 | 87.8% | 241 | 128 |
-| brotli-11 | 0.086 | 91.4% | 1 | 95 |
-| **lz4** | 0.211 | 78.9% | **1458** | **941** |
+| comprexia-fast | 0.197 | 80.3% | 959 | 216 |
+| gzip-1 | 0.148 | 85.2% | 465 | 178 |
+| gzip-6 | 0.114 | 88.6% | 133 | 170 |
+| brotli-4 | 0.122 | 87.8% | 232 | 126 |
+| brotli-11 | 0.086 | 91.4% | 1 | 98 |
+| **lz4** | 0.211 | 78.9% | **1451** | **965** |
 
 **Multilingual JSON — Hindi, Bengali, Tamil, emoji, 355 kB**
 
 | Codec | Ratio | Saved | Compress MB/s | Decompress MB/s |
 | --- | ---: | ---: | ---: | ---: |
-| comprexia-fast | 0.095 | 90.5% | 595 | 147 |
-| gzip-1 | 0.047 | 95.3% | 1046 | 135 |
+| comprexia-fast | 0.095 | 90.5% | 2195 | 275 |
+| gzip-1 | 0.047 | 95.3% | 1080 | 135 |
 | brotli-4 | 0.038 | 96.2% | 532 | 112 |
-| **lz4** | 0.064 | 93.6% | **3587** | 635 |
+| **lz4** | 0.064 | 93.6% | **3617** | 626 |
 
 **Small API response — 1.5 kB**
 
 | Codec | Ratio | Saved | Compress MB/s | Decompress MB/s |
 | --- | ---: | ---: | ---: | ---: |
-| comprexia-fast | 0.454 | 54.6% | 81 | **439** |
-| gzip-1 | 0.328 | 67.2% | 119 | 93 |
-| brotli-4 | 0.296 | 70.4% | 62 | 80 |
-| lz4 | 0.432 | 56.8% | 827 | 1105 |
+| comprexia-fast | 0.456 | 54.4% | 660 | 472 |
+| gzip-1 | 0.328 | 67.2% | 128 | 102 |
+| brotli-4 | 0.296 | 70.4% | 62 | 79 |
+| lz4 | 0.432 | 56.8% | 877 | **1028** |
 
-Read honestly: **gzip at level 1 dominates comprexia on four of five datasets
-across both axes at once** — smaller output *and* faster compression, with zero
-install cost. LZ4 is 3–8× faster to compress at a comparable ratio. The single
-column comprexia wins outright is decompression of small payloads, where it is
-4.7× faster than gzip; that is a real property of a decoder with no entropy
-stage, and it is the thread worth pulling on.
+Read honestly: after the 0.2.0 encoder rewrite, **comprexia compresses 2–6×
+faster than gzip level 1** on every dataset, and small responses — its worst
+case at 81 MB/s before — improved 8× to 660 MB/s. Against LZ4 the compression
+gap narrowed from 3–8× to roughly 1.5×.
 
-The gap is also explainable rather than mysterious. The match finder inserts
-every position into a `std::unordered_map`, which is roughly the slowest data
-structure available for the job, and the format spends a full byte of header on
-every short literal run with no entropy coding anywhere. Both are fixable, and
-fixing them is what [docs/DESIGN.md](docs/DESIGN.md) describes.
+What has not changed is the **ratio**, and that is still the honest weak spot:
+gzip level 1 produces smaller output than comprexia on every dataset here, at a
+third of the speed. Decompression also remains far behind LZ4 (216 vs 965 MB/s
+on the API list) because the decoder still copies matches through
+`std::vector`'s append path rather than the over-allocated wildcopy LZ4 uses.
+
+Both gaps have known causes rather than mysterious ones. The ratio needs an
+entropy coding stage, which is what separates LZ4 from gzip and zstd; the
+decoder needs wildcopy. Both are described in [docs/DESIGN.md](docs/DESIGN.md).
 
 ---
 
@@ -162,7 +165,21 @@ messages is not exploited. Correct, but it leaves ratio on the table for event
 streams — exactly the workload streaming exists for.
 
 **The ratio is not competitive.** See [Benchmarks](#benchmarks). This is the
-honest state of a hand-written LZ with no entropy coding stage.
+honest state of a hand-written LZ with no entropy coding stage — the missing
+piece is Huffman or FSE over literals and lengths, not more match-finder tuning.
+
+**Decompression trails LZ4 by ~4×.** Matches are copied through `std::vector`'s
+append path rather than the over-allocated wildcopy LZ4 uses.
+
+### Fixed in 0.2.0
+
+- **A 130-byte match silently corrupted data.** Short match blocks encode
+  `len - 3` in seven bits, so `len == 130` emitted header `0xFF` — which is the
+  extended-match marker. The decoder misread it and returned wrong bytes, or
+  threw, depending on what followed. Random fuzzing never happened to land on
+  the single length that breaks; a systematic sweep of every match length from
+  1 to 320 now runs on every commit. Short blocks stop at 129, which keeps
+  `0xFF` unambiguous and leaves the format readable by older decoders.
 
 ### Fixed in 0.1.3
 
@@ -413,11 +430,16 @@ node/               TypeScript wrapper, middleware, browser decoder
 test/cpp/           ASan/UBSan roundtrip fuzz harness
 ```
 
-The encoder hashes 4-byte sequences and keeps one candidate position per hash,
-extending matches forward on a hit. `compress` extends up to 258 bytes;
-`compressFast` caps at 64 for tighter inner loops. The decoder replays literal
-runs and back-references with no entropy stage, which is why decompression is
-fast and the ratio is mediocre — the two are the same trade.
+The encoder hashes 4-byte sequences into a flat, power-of-two table sized to the
+input, keeping one candidate position per slot and extending matches eight bytes
+at a time. `compress` extends up to 258 bytes and uses extended match blocks for
+long repeats; `compressFast` caps at 64 for tighter inner loops. The decoder
+replays literal runs and back-references with no entropy stage, which is why the
+ratio is mediocre — speed and ratio are the same trade here.
+
+Sizing the hash table to the input matters more than it looks: a fixed 64 k-entry
+table costs a 256 kB clear, which for a 1.5 kB API response is far more work than
+the compression itself.
 
 Every codec change is compiled with AddressSanitizer and UndefinedBehaviorSanitizer
 in CI and run against a deterministic fuzz harness covering random, repetitive,

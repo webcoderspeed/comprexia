@@ -113,6 +113,26 @@ int main() {
     check_all("single byte", {static_cast<uint8_t>(b)});
   }
 
+  // Every match length in and around the block-encoding boundaries. Random
+  // fuzzing missed that a 130-byte match encodes as header 0xFF — the
+  // extended-match marker — and decoded as garbage. A length sweep finds that
+  // class of bug immediately, where random data almost never lands on the one
+  // length that breaks.
+  for (size_t run = 1; run <= 320; ++run) {
+    std::vector<uint8_t> pattern(run);
+    for (size_t k = 0; k < run; ++k) pattern[k] = static_cast<uint8_t>(k * 7 + 11);
+
+    // Two copies followed by a byte that cannot continue the match, so the
+    // match length is exactly `run`.
+    for (uint8_t terminator : {uint8_t{0x00}, uint8_t{0x42}}) {
+      std::vector<uint8_t> input;
+      input.insert(input.end(), pattern.begin(), pattern.end());
+      input.insert(input.end(), pattern.begin(), pattern.end());
+      input.push_back(terminator);
+      check_all("exact match length", input);
+    }
+  }
+
   for (int round = 0; round < 200; ++round) {
     const size_t len = static_cast<size_t>(next_rand() % 8192);
     const auto data = random_bytes(len);

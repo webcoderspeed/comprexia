@@ -1,6 +1,8 @@
 #include "comprexia/decoder.h"
 #include "preprocessor.h"
+
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 
 namespace cx {
@@ -14,21 +16,33 @@ namespace cx {
 // that does not belong to us.
 std::vector<uint8_t> decompress(const uint8_t* data, size_t len) {
   std::vector<uint8_t> out;
-  out.reserve(len * 2);
+  out.reserve(len * 3);
 
-  auto copy_match = [&out](size_t mlen, size_t dist) {
-    // dist == 0 would make the back-reference point at the write cursor and
-    // loop forever; dist > out.size() would read before the buffer.
+  const auto copy_match = [&out](size_t mlen, size_t dist) {
+    // dist == 0 would make the back-reference point at the write cursor;
+    // dist > out.size() would read before the buffer.
     if (dist == 0 || dist > out.size()) {
       throw std::runtime_error("comprexia: invalid back-reference distance");
     }
+
     const size_t start = out.size() - dist;
-    // Overlapping copies are legal and intentional (they encode run-length
-    // repeats), so this must read through the vector as it grows rather than
-    // memcpy a fixed span. Reserving first keeps the reference stable.
-    out.reserve(out.size() + mlen);
-    for (size_t k = 0; k < mlen; ++k) {
-      out.push_back(out[start + k]);
+
+    // Short non-overlapping copies stay on the append path: resizing first
+    // costs a zero-fill of the new range that a handful of appends beat.
+    // Longer ones amortise that easily and take the block copy.
+    if (dist >= mlen && mlen >= 32) {
+      const size_t old_size = out.size();
+      out.resize(old_size + mlen);
+      // resize may reallocate, so both pointers are taken afterwards.
+      std::memcpy(out.data() + old_size, out.data() + start, mlen);
+    } else {
+      // Overlapping matches are how a short pattern encodes a long run, so
+      // they must be copied forward one byte at a time to reproduce it.
+      // No reserve() here: asking for an exact size defeats the vector's
+      // geometric growth and reallocates on nearly every match.
+      for (size_t k = 0; k < mlen; ++k) {
+        out.push_back(out[start + k]);
+      }
     }
   };
 
