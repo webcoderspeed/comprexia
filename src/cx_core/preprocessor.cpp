@@ -1,5 +1,6 @@
 #include "preprocessor.h"
 #include <cctype>
+#include <string>
 #include <algorithm>
 #include <unordered_map>
 
