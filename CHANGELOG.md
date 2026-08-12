@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.6](https://github.com/webcoderspeed/comprexia/compare/v0.1.5...v0.1.6) (2026-08-12)
+
+### ⚡ Performance
+
+* rewrite the match finder and fix a format-level corruption bug ([0a7862c](https://github.com/webcoderspeed/comprexia/commit/0a7862cc2de84b7fc4fe397e784a45d6c3f79c26))
+
 ## [0.1.5](https://github.com/webcoderspeed/comprexia/compare/v0.1.4...v0.1.5) (2026-08-12)
 
 ### 🐛 Bug Fixes
