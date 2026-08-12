@@ -3,6 +3,16 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.2.0](https://github.com/webcoderspeed/comprexia/compare/v0.1.10...v0.2.0) (2026-08-12)
+
+### ✨ Features
+
+* **pack:** add the transform-then-compress engine ([06cbfd7](https://github.com/webcoderspeed/comprexia/commit/06cbfd798aef51664a0dd079e39369762bd78d7c))
+
+### 🐛 Bug Fixes
+
+* **build:** type Error's cause option ([ebe3e18](https://github.com/webcoderspeed/comprexia/commit/ebe3e182fd0959ad2b459c70b491a417c314851c))
+
 ## [0.1.10](https://github.com/webcoderspeed/comprexia/compare/v0.1.9...v0.1.10) (2026-08-12)
 
 ### ⚡ Performance
