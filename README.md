@@ -30,7 +30,7 @@
 Most compression libraries open with a benchmark that flatters them. This one
 opens with the benchmark that does not.
 
-**Comprexia is a working prototype, not yet a production codec.** As of 0.2.0 it
+**Comprexia is a working prototype, not yet a production codec.** As of 0.1.6 it
 compresses 2–6× faster than `gzip -1`, but `gzip -1` still produces *smaller*
 output on every dataset tested — and it is built into Node, needs no native
 addon, and runs everywhere. Until the ratio gap closes, that is the honest
@@ -128,7 +128,7 @@ npm run bench:honest
 | brotli-4 | 0.296 | 70.4% | 62 | 79 |
 | lz4 | 0.432 | 56.8% | 877 | **1028** |
 
-Read honestly: after the 0.2.0 encoder rewrite, **comprexia compresses 2–6×
+Read honestly: after the 0.1.6 encoder rewrite, **comprexia compresses 2–6×
 faster than gzip level 1** on every dataset, and small responses — its worst
 case at 81 MB/s before — improved 8× to 660 MB/s. Against LZ4 the compression
 gap narrowed from 3–8× to roughly 1.5×.
@@ -171,7 +171,7 @@ piece is Huffman or FSE over literals and lengths, not more match-finder tuning.
 **Decompression trails LZ4 by ~4×.** Matches are copied through `std::vector`'s
 append path rather than the over-allocated wildcopy LZ4 uses.
 
-### Fixed in 0.2.0
+### Fixed in 0.1.6
 
 - **A 130-byte match silently corrupted data.** Short match blocks encode
   `len - 3` in seven bits, so `len == 130` emitted header `0xFF` — which is the

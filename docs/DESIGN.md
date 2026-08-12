@@ -29,14 +29,14 @@ failing input. The v2 format is designed so this class of bug cannot exist.
    window before copying, and callers can cap the output size.*
 5. **Slow match finder.** `std::unordered_map<uint32_t, size_t>` per-position
    insert dominated encode time. *Rule: flat arrays only on the hot path.*
-   **Fixed in 0.2.0** — a flat, input-sized table plus 64-bit match comparison
+   **Fixed in 0.1.6** — a flat, input-sized table plus 64-bit match comparison
    made encoding 2–8× faster.
 7. **Header collision at match length 130.** A short match block encodes
    `len - 3` in seven bits, so `len == 130` produced header `0xFF` — the
    extended-match marker — and the decoder misread it, silently corrupting any
    payload containing a 130-byte repeat. Random fuzzing never landed on the one
    length that breaks. *Rule: sweep boundary values exhaustively; do not rely on
-   random inputs to find format edge cases.* **Fixed in 0.2.0.**
+   random inputs to find format edge cases.* **Fixed in 0.1.6.**
 6. **No framing.** v0.1 streams carry no magic, version, or checksum, so
    corruption is undetectable and format evolution is impossible.
 
@@ -56,7 +56,7 @@ settings. Full tables in the README; the summary that drives this design:
 The old "1206 MB/s" figure came from a benchmark that concatenated one file to
 1 MB — near-pure repetition. Any new claim must come from `bench:honest`.
 
-**Update (0.2.0):** the first half of that gap is closed. Replacing the hash map
+**Update (0.1.6):** the first half of that gap is closed. Replacing the hash map
 with a flat, input-sized table and comparing eight bytes at a time made encoding
 2–8× faster — comprexia now compresses 2–6× faster than `gzip -1` and sits
 within ~1.5× of LZ4. Sizing the table to the input rather than fixing it at 64 k
