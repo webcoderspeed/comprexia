@@ -180,7 +180,7 @@ jobs:
         run: npm ci
 
       # No NPM_TOKEN: publishing authenticates via OIDC trusted publishing.
-      # Requires a trusted publisher for `@comprexia/cx` on npmjs.com pointing
+      # Requires a trusted publisher for `comprexia` on npmjs.com pointing
       # at this repository and workflow file.
       - name: Release
         env:

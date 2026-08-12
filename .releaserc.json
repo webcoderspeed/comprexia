@@ -59,7 +59,7 @@
       "@semantic-release/changelog",
       {
         "changelogFile": "CHANGELOG.md",
-        "changelogTitle": "# Changelog\n\nAll notable changes to **@comprexia/cx** are documented in this file.\nThis project adheres to [Semantic Versioning](https://semver.org)."
+        "changelogTitle": "# Changelog\n\nAll notable changes to **comprexia** are documented in this file.\nThis project adheres to [Semantic Versioning](https://semver.org)."
       }
     ],
     [
@@ -73,7 +73,7 @@
       "@semantic-release/github",
       {
         "assets": [{ "path": "release/*.tgz", "label": "npm tarball" }],
-        "successComment": "🎉 This issue has been resolved in version ${nextRelease.version}.\nInstall it: `npm install @comprexia/cx@${nextRelease.version}`",
+        "successComment": "🎉 This issue has been resolved in version ${nextRelease.version}.\nInstall it: `npm install comprexia@${nextRelease.version}`",
         "labels": ["released"],
         "releasedLabels": ["released@${nextRelease.channel}"]
       }

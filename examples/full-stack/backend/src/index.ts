@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import { createComprexiaMiddleware } from '@comprexia/cx';
+import { createComprexiaMiddleware } from 'comprexia';
 import { jsonPlaceholderRouter } from './routes/jsonplaceholder';
 
 const app = express();

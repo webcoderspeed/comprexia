@@ -26,7 +26,7 @@ body:
       description: The smallest code snippet that shows the problem.
       render: typescript
       placeholder: |
-        const { compress, decompress } = require('@comprexia/cx')
+        const { compress, decompress } = require('comprexia')
 
         const input = Buffer.from('…')
         // …

@@ -1,5 +1,5 @@
 {
-  "name": "@comprexia/cx",
+  "name": "comprexia",
   "version": "0.1.1",
   "description": "High-performance HTTP compression addon with new algorithm (prototype)",
   "main": "dist/index.js",

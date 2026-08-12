@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@comprexia/cx"><img src="https://img.shields.io/npm/v/@comprexia/cx" alt="npm version"/></a>
+  <a href="https://www.npmjs.com/package/comprexia"><img src="https://img.shields.io/npm/v/comprexia" alt="npm version"/></a>
   <a href="https://github.com/webcoderspeed/comprexia/actions/workflows/ci.yml"><img src="https://github.com/webcoderspeed/comprexia/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="https://github.com/webcoderspeed/comprexia/actions/workflows/codeql.yml"><img src="https://github.com/webcoderspeed/comprexia/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT"/></a>
@@ -18,7 +18,7 @@
 
 <p align="center">
   <a href="https://github.com/webcoderspeed/comprexia">GitHub</a> &middot;
-  <a href="https://www.npmjs.com/package/@comprexia/cx">npm</a> &middot;
+  <a href="https://www.npmjs.com/package/comprexia">npm</a> &middot;
   <a href="https://github.com/webcoderspeed/comprexia/issues">Issues</a> &middot;
   <a href="docs/DESIGN.md">Design doc</a>
 </p>
@@ -170,7 +170,7 @@ future encoding token containing those characters would false-positive.
 ## Installation
 
 ```bash
-npm install @comprexia/cx
+npm install comprexia
 ```
 
 Requires **Node 18+**, a **C++20 compiler**, and **CMake 3.20+** — the native
@@ -185,7 +185,7 @@ requirement as a hard install dependency.
 ## Quick start
 
 ```typescript
-import { compress, decompress } from '@comprexia/cx'
+import { compress, decompress } from 'comprexia'
 
 const original = Buffer.from(JSON.stringify({ id: 1, name: 'संजीव' }))
 
@@ -209,7 +209,7 @@ restored.equals(original) // true — for any input bytes
 | `createCompressorStream(): Transform` | Node `Transform` stream for chunked responses. |
 | `negotiateEncoding(header?: string): 'cx' \| undefined` | Returns `'cx'` when the client advertises support. |
 | `createComprexiaMiddleware(opts?)` | Express middleware. `opts.level` is `'fast'` (default) or `'advanced'`. |
-| `@comprexia/cx/web/decoder` | Browser decoder — `decompressBrowser`, `decompressToString`. |
+| `comprexia/web/decoder` | Browser decoder — `decompressBrowser`, `decompressToString`. |
 
 `compress` and `compressFast` emit the same stream format, so a single
 `decompress` reads both. There is no header, no version byte, and no checksum —
@@ -223,7 +223,7 @@ a limitation the v2 format fixes.
 
 ```typescript
 import express from 'express'
-import { createComprexiaMiddleware } from '@comprexia/cx'
+import { createComprexiaMiddleware } from 'comprexia'
 
 const app = express()
 
@@ -253,7 +253,7 @@ existing gzip middleware keeps working untouched.
 
 ```typescript
 import Fastify from 'fastify'
-import { compressFast, negotiateEncoding } from '@comprexia/cx'
+import { compressFast, negotiateEncoding } from 'comprexia'
 
 const app = Fastify()
 
@@ -277,7 +277,7 @@ app.listen({ port: 3002 })
 
 ```typescript
 import { Injectable, NestMiddleware } from '@nestjs/common'
-import { compressFast, negotiateEncoding } from '@comprexia/cx'
+import { compressFast, negotiateEncoding } from 'comprexia'
 
 @Injectable()
 export class ComprexiaMiddleware implements NestMiddleware {
@@ -300,7 +300,7 @@ export class ComprexiaMiddleware implements NestMiddleware {
 ### Streaming responses
 
 ```javascript
-const { negotiateEncoding, createCompressorStream } = require('@comprexia/cx')
+const { negotiateEncoding, createCompressorStream } = require('comprexia')
 
 app.get('/events', (req, res) => {
   if (negotiateEncoding(req.headers['accept-encoding']) !== 'cx') {
@@ -332,7 +332,7 @@ earlier docs leaked an interval per connection.
 
 ```typescript
 import axios from 'axios'
-import { decompressToString } from '@comprexia/cx/web/decoder'
+import { decompressToString } from 'comprexia/web/decoder'
 
 const api = axios.create({ baseURL: '/api' })
 
