@@ -112,6 +112,75 @@ jobs:
           path: pack/*.tgz
           retention-days: 3
 
+  # Everything above installs devDependencies, which is exactly what a consumer
+  # does NOT get. That gap shipped a package whose install hook called a binary
+  # only present in devDependencies, so `npm install comprexia` failed for every
+  # user while CI stayed green. This job installs the real tarball into a clean
+  # project with no dev tooling and exercises the public API.
+  consumer-install:
+    name: Install as a consumer would
+    needs: build-test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download package tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: pack
+
+      - name: Install the tarball into a clean project
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/pack/*.tgz
+
+      - name: Exercise the installed package
+        working-directory: ${{ runner.temp }}/consumer
+        run: |
+          node -e "
+            const cx = require('comprexia');
+
+            const payload = JSON.stringify({
+              name: 'संजीव शर्मा', msg: 'done 🎉', path: 'C:\\\\\\\\x\\\\\\\\',
+            });
+            const input = Buffer.from(payload);
+
+            for (const enc of ['compress', 'compressFast']) {
+              if (!cx.decompress(cx[enc](input)).equals(input)) {
+                throw new Error(enc + ' roundtrip failed');
+              }
+            }
+            if (!cx.decompressAdvanced(cx.compressAdvanced(input)).equals(input)) {
+              throw new Error('advanced roundtrip failed');
+            }
+
+            let threw = false;
+            try { cx.decompress(Buffer.from([0x85, 0xff, 0xff])); }
+            catch { threw = true; }
+            if (!threw) throw new Error('decoder accepted a malformed stream');
+
+            if (cx.negotiateEncoding('cxfuture') !== undefined) {
+              throw new Error('negotiateEncoding false-positived');
+            }
+
+            const { decompressToString } = require('comprexia/web/decoder');
+            if (decompressToString(cx.compressFast(input)) !== payload) {
+              throw new Error('browser decoder subpath broken');
+            }
+
+            console.log('consumer install verified');
+          "
+
   benchmarks:
     name: Benchmark smoke
     needs: quality
@@ -146,7 +215,7 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
-    needs: [build-test, sanitizers, benchmarks]
+    needs: [build-test, sanitizers, benchmarks, consumer-install]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write # push release tag + chore(release) commit
