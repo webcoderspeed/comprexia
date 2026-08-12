@@ -129,8 +129,10 @@ jobs:
       - name: Install & build
         run: npm ci
 
+      # bench:honest verifies every codec roundtrips byte-exactly before timing
+      # it, so this doubles as a cross-codec correctness check.
       - name: Run benchmarks
-        run: npm run bench | tee bench-output.txt
+        run: npm run bench:honest | tee bench-output.txt
 
       - name: Publish benchmark summary
         run: |

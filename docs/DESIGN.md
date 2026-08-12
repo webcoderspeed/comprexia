@@ -32,6 +32,54 @@ failing input. The v2 format is designed so this class of bug cannot exist.
 6. **No framing.** v0.1 streams carry no magic, version, or checksum, so
    corruption is undetectable and format evolution is impossible.
 
+## Where the codec actually stands (measured, Aug 2026)
+
+`npm run bench:honest` on realistic payloads, competitors at production
+settings. Full tables in the README; the summary that drives this design:
+
+- **gzip level 1 beats comprexia on both ratio and encode speed** on four of
+  five datasets. It is built into Node and needs no addon.
+- **LZ4 is 3–8× faster to compress** at a comparable ratio (1458–3587 MB/s vs
+  our 81–671 MB/s), with prebuilt npm binaries.
+- The one axis we win: **decompression of small payloads**, 439 MB/s vs gzip's
+  93 MB/s. A decoder with no entropy stage is genuinely fast; that is the
+  property worth building on.
+
+The old "1206 MB/s" figure came from a benchmark that concatenated one file to
+1 MB — near-pure repetition. Any new claim must come from `bench:honest`.
+
+Two causes explain nearly all of the encode gap, and both are M1 work: the
+match finder inserts every position into a `std::unordered_map`, and the format
+spends a byte of header per short literal run with no entropy coding.
+
+## Competitive landscape — why v2 targets dictionaries
+
+The ecosystem moved while v0.1 was being written:
+
+- **Zstd ships inside Node** (`node:zlib`, since v23.8). A native addon that
+  offers general-purpose ratio now competes with something already installed,
+  maintained by Meta, and tuned for a decade. That race is unwinnable and not
+  worth entering.
+- **LZ4 owns the fast lane** and already has npm prebuilds.
+- **msgpackr / cbor-x attack the problem one layer up**, replacing
+  `JSON.stringify` entirely and beating it on both speed and size.
+
+The open gap is **dictionary compression**. A dictionary trained on a family of
+similar payloads takes small JSON from roughly 32% of original size to under
+10% — precisely the regime where every general-purpose codec is weakest, and
+where comprexia is worst today (0.454 on a 1.5 kB response). Dictionaries also
+*speed up* compression rather than trading against it.
+
+This is now a web standard, not a niche trick: Compression Dictionary Transport
+shipped in Chrome 130 with the `dcb` (brotli) and `dcz` (zstd) content-encoding
+tokens, and Google Search measured 23% smaller HTML using it. The Go ecosystem
+has middleware for this; **Node has none**.
+
+So v2's differentiator is not "a faster LZ" — it is **making dictionary-based
+compression easy for a Node API**: train a dictionary from real traffic samples,
+ship it to clients, negotiate it over HTTP, and fall back cleanly. The LZ core
+below still has to be correct and fast, but it is the foundation, not the pitch.
+
 ## Goals
 
 - **Latency-first**: beat gzip on encode throughput by a wide margin at a
@@ -107,5 +155,18 @@ stage ever sees it.
    format, shared test vectors with the native side.
 3. **M3 — JSON layer**: tokenizer + key dictionary behind the flag, its own
    fuzzer, honest before/after benchmarks.
-4. **M4 — ship**: prebuilt binaries (prebuildify) so `npm install` needs no
+4. **M4 — trained dictionaries**: build a dictionary from sample payloads,
+   reference it by hash in the container, negotiate it over HTTP, and provide
+   the middleware that makes this a two-line change for an Express app. This is
+   the milestone that gives the project a reason to exist alongside zstd.
+5. **M5 — ship**: prebuilt binaries (prebuildify) so `npm install` needs no
    toolchain, README rewritten around measured v2 numbers.
+
+## Open question worth settling early
+
+If dictionaries are the differentiator, an honest fork in the road: the
+dictionary middleware could sit on top of **Node's built-in zstd** instead of a
+custom codec, and would almost certainly beat a hand-written LZ on ratio from
+day one. That path trades away the fun of writing a codec for a product people
+would actually deploy. Both are legitimate; pick deliberately rather than by
+default, and let `bench:honest` decide it with numbers.
