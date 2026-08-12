@@ -13,14 +13,18 @@
       "require": "./dist/web/decoder.js",
       "types": "./dist/web/decoder.d.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./pack": {
+      "require": "./dist/pack/index.js",
+      "types": "./dist/pack/index.d.ts"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:release": "cmake-js compile --CDCMAKE_BUILD_TYPE=Release",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "compile": "cmake-js compile",
-    "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js && node test/node/defects.test.js",
+    "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js && node test/node/defects.test.js && node test/node/pack.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "tsc -p tsconfig.json",
@@ -30,7 +34,8 @@
     "bench": "node benchmarks/runner/index.js",
     "benchmark": "node benchmarks/runner/index.js",
     "benchmark:depth": "node benchmarks/runner/depth.js",
-    "bench:honest": "node benchmarks/runner/honest.js"
+    "bench:honest": "node benchmarks/runner/honest.js",
+    "bench:engine": "node benchmarks/runner/engine.js"
   },
   "files": [
     "dist/**",

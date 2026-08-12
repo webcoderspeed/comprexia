@@ -1,9 +1,9 @@
 # comprexia
 
 <p align="center">
-  <strong>A JSON-aware compression codec for Node.js APIs, written in C++20.</strong><br/>
-  Native N-API addon &middot; Streaming encoder &middot; Express middleware &middot; Browser decoder<br/>
-  <em>Status: v0.x prototype — see <a href="#honest-status">Honest status</a> before you deploy it.</em>
+  <strong>A compression engine that reshapes data before compressing it.</strong><br/>
+  Transform pipeline &middot; Pluggable codecs &middot; Native C++20 codec &middot; Express middleware &middot; Browser decoder<br/>
+  <em>Status: v0.x — the engine is the interesting part; see <a href="#honest-status">Honest status</a>.</em>
 </p>
 
 <p align="center">
@@ -25,17 +25,100 @@
 
 ---
 
+## The engine
+
+Most compression libraries compete on the entropy coder. That race is over —
+zstd ships inside Node, brotli ships in every browser, and both have had a
+decade of tuning. Comprexia competes somewhere else: **on the shape of the data
+before a codec ever sees it.**
+
+An array of similar JSON objects stores every field interleaved with unrelated
+fields, so a compressor never sees two similar values adjacent. Transpose it
+into columns and the same bytes compress dramatically better — using the same
+codec. That is the whole idea, and it is worth more than any match-finder
+change in this repository.
+
+```typescript
+import { pack, unpack } from 'comprexia/pack'
+
+const body = Buffer.from(JSON.stringify({ data: users }))
+
+const packed = pack(body)      // picks the transform and codec for you
+const restored = unpack(packed) // byte-identical to `body`
+```
+
+Measured against the same codec with no transform. Reproduce with
+`npm run bench:engine`, which verifies every result byte-exactly before
+reporting it:
+
+| Payload | gzip | engine + gzip | brotli | engine + brotli |
+| --- | ---: | ---: | ---: | ---: |
+| API records, 2000 rows (284 kB) | 37,493 | **20,077** (−46%) | 31,629 | **16,063** (−49%) |
+| API records, 200 rows (28 kB) | 4,047 | **2,417** (−40%) | 3,338 | **2,080** (−38%) |
+| Multilingual records (387 kB) | 25,815 | **7,597** (−71%) | 18,941 | **5,883** (−69%) |
+| Float32 telemetry (195 kB) | 154,441 | **106,095** (−31%) | 135,099 | **106,584** (−21%) |
+| English prose (148 kB) | 24,809 | 24,823 (+0.1%) | 28,357 | 28,371 (+0.0%) |
+
+Prose is the honest control: there is no structure to exploit, the engine
+detects that, applies no transform, and costs you the 14-byte header. **It never
+makes a payload larger than the codec would have on its own**, because the
+untransformed candidate is always in the running and the smallest one wins.
+
+### How it stays lossless
+
+The last transform in this codebase assumed it was reversible and corrupted
+every non-ASCII payload it touched. This one assumes nothing:
+
+- **Every transform is verified at pack time.** The engine runs the inverse and
+  compares byte-for-byte before emitting. A transform that fails is silently
+  dropped and the next candidate is used.
+- **Non-canonical JSON is declined, not rewritten.** Pretty-printed input,
+  `1.0`, `1e2`, and `\u0041` all survive a parse but not a re-stringify, so the
+  columnar transform refuses them rather than quietly changing the bytes.
+- **The container records everything.** Transform id, codec id, original length,
+  and a checksum over the original bytes. `unpack` never guesses, and a
+  transform that fails to invert is caught rather than returned.
+
+### Transforms
+
+| Transform | Applies to | What it does |
+| --- | --- | --- |
+| `columnar-json` | arrays of ≥4 objects with identical keys | transposes rows into columns, then delta-encodes integer columns where that is smaller |
+| `byte-shuffle` | fixed-width numeric series (opt in with `shuffleWidth`) | groups the Nth byte of every element, collapsing near-identical exponent planes |
+| `none` | everything else | passthrough |
+
+### Codecs
+
+`zstd` when the runtime has it (Node 23.8+), `brotli`, `gzip`, and `cx` — this
+project's own native codec. Pick one with `{ codec: 'brotli' }` or let the
+engine choose. The transform is the value; the codec stays replaceable.
+
+### Cost
+
+Packing runs roughly 4× slower than calling the codec directly, because it
+builds candidates, verifies the inverse, and compresses more than once.
+`{ verify: false }` trades the correctness guarantee for speed — not
+recommended for data you did not produce. Unpacking is a normal decompress plus
+one linear pass.
+
+---
+
 ## Honest status
 
 Most compression libraries open with a benchmark that flatters them. This one
 opens with the benchmark that does not.
 
-**Comprexia is a working prototype, not yet a production codec.** As of 0.1.6 it
-compresses 2–6× faster than `gzip -1`, but `gzip -1` still produces *smaller*
-output on every dataset tested — and it is built into Node, needs no native
-addon, and runs everywhere. Until the ratio gap closes, that is the honest
-trade. The numbers are in [Benchmarks](#benchmarks), reproducible with
-`npm run bench:honest`.
+**The engine is the part worth using. The bundled codec is not yet competitive
+on ratio.** Those are two separate claims and they deserve separate treatment.
+
+[The engine](#the-engine) beats gzip and brotli by 21–71% on structured data,
+using those same codecs underneath — that result does not depend on the C++
+codec at all, and works on a runtime with no native addon.
+
+The C++ codec compresses 2–6× faster than `gzip -1` and decompresses 2–5×
+faster, but `gzip -1` still produces *smaller* output on every dataset tested.
+Until an entropy stage lands, that is the honest trade, and it is why the engine
+defaults to zstd or brotli rather than to `cx`.
 
 An earlier version of this README quoted 1206 MB/s. That figure came from a
 benchmark that concatenated one sample file until it reached 1 MB — near-pure
@@ -58,13 +141,15 @@ What is not here: a competitive compression ratio or competitive encode speed.
 See [Known limitations](#known-limitations) — they are documented rather than
 hidden, and [docs/DESIGN.md](docs/DESIGN.md) is the plan for fixing them.
 
-Use this today if you want to read, learn from, or contribute to a compression
-codec. Do not use it to serve production traffic yet.
+Use the engine if you serve structured JSON and control both ends. Use the C++
+codec if you want to read, learn from, or contribute to a compression codec —
+not yet to serve production traffic.
 
 ---
 
 ## Table of contents
 
+- [The engine](#the-engine)
 - [Honest status](#honest-status)
 - [Benchmarks](#benchmarks)
 - [Known limitations](#known-limitations)
@@ -89,6 +174,9 @@ codec. Do not use it to serve production traffic yet.
 ---
 
 ## Benchmarks
+
+This section measures the **bundled C++ codec** against other codecs. For the
+engine's numbers — which are the interesting ones — see [The engine](#the-engine).
 
 Node 20, Apple Silicon, deterministic synthetic payloads that resemble real API
 traffic rather than repeated blobs. Competitors run at the settings servers
