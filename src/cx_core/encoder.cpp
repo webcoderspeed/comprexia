@@ -1,16 +1,21 @@
 #include "comprexia/encoder.h"
 #include "preprocessor.h"
 #include <cstdint>
+#include <cstring>
 #include <algorithm>
 #include <vector>
 #include <unordered_map>
 
 namespace cx {
 
-// Fast rolling hash function (xxHash inspired)
+static inline uint32_t load32(const uint8_t* p) {
+  uint32_t v;
+  std::memcpy(&v, p, sizeof(v));
+  return v;
+}
+
 static inline uint32_t hash4(const uint8_t* p) {
-  return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
-         (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
+  return load32(p);
 }
 
 // Hash chain match finder - O(n) complexity instead of O(n²)
@@ -58,7 +63,7 @@ static size_t find_match_ultrafast(const uint8_t* data, size_t pos, size_t len,
     size_t candidate_pos = it->second;
     size_t dist = pos - candidate_pos;
     if (dist <= 65535) {
-      if (*(const uint32_t*)(data + candidate_pos) == *(const uint32_t*)(data + pos)) {
+      if (load32(data + candidate_pos) == load32(data + pos)) {
         const size_t max_len = std::min(len - pos, static_cast<size_t>(64));
         size_t mlen = 4;
         while (mlen < max_len && data[candidate_pos + mlen] == data[pos + mlen]) {
