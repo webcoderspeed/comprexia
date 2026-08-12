@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2020",
+    // Emit stays ES2020 for output compatibility; the lib is raised only so
+    // Error's `cause` option is typed. It exists at runtime from Node 16.9,
+    // well below this package's Node 18 floor.
+    "lib": ["ES2022"],
     "module": "CommonJS",
     "declaration": true,
     "outDir": "dist",
