@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.7](https://github.com/webcoderspeed/comprexia/compare/v0.1.6...v0.1.7) (2026-08-12)
+
+### 📚 Documentation
+
+* label the encoder rewrite 0.1.6, not 0.2.0 ([ed46a64](https://github.com/webcoderspeed/comprexia/commit/ed46a64945cb4c565fd5fb84d67e3cf6baba1bae))
+
 ## [0.1.6](https://github.com/webcoderspeed/comprexia/compare/v0.1.5...v0.1.6) (2026-08-12)
 
 ### ⚡ Performance

@@ -1,6 +1,6 @@
 {
   "name": "comprexia",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "High-performance HTTP compression addon with new algorithm (prototype)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
