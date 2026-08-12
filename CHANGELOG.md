@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.8](https://github.com/webcoderspeed/comprexia/compare/v0.1.7...v0.1.8) (2026-08-12)
+
+### 🐛 Bug Fixes
+
+* repair streaming format, bound decompression, and stop mislabelling advanced payloads ([6b32644](https://github.com/webcoderspeed/comprexia/commit/6b3264443a4d6daae2ee0f3c5fec6c5a6c24812f))
+
 ## [0.1.7](https://github.com/webcoderspeed/comprexia/compare/v0.1.6...v0.1.7) (2026-08-12)
 
 ### 📚 Documentation
