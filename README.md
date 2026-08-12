@@ -171,6 +171,30 @@ piece is Huffman or FSE over literals and lengths, not more match-finder tuning.
 **Decompression trails LZ4 by ~4×.** Matches are copied through `std::vector`'s
 append path rather than the over-allocated wildcopy LZ4 uses.
 
+### Fixed in 0.1.7
+
+- **The streaming encoder produced output its own decoder rejected.** It was a
+  second, independent implementation of the block format and never received the
+  130-byte fix below, so any stream containing a repeat of that length either
+  threw or silently decoded to wrong bytes. Both encoders now write blocks
+  through one shared definition, and the fuzz harness exercises the streaming
+  path across several chunk sizes.
+- **Decompression was unbounded.** Five bytes of extended match block emit up to
+  65535, so 100 kB of crafted input decoded to 1.3 GB and could exhaust a
+  server's memory. All decode entry points now accept `maxOutputLength` and
+  default to 256 MB.
+- **`level: 'advanced'` sent undecodable responses.** It labelled its output
+  `Content-Encoding: cx` — the same coding as the fast format, which reverses a
+  different transform — so clients silently decoded corrupt JSON. Advanced
+  payloads now use `cx-adv`, negotiated separately, and the browser decoder
+  gained `decompressAdvancedToString` to read them.
+- **A failed send left `Content-Encoding` on a plain body.** The middleware set
+  headers before compressing, so falling back to uncompressed JSON kept the
+  encoding header committed.
+- **`Accept-Encoding: cx;q=0, *` was read as acceptance.** Per RFC 9110 §12.5.3
+  a wildcard only covers codings not explicitly listed, so an explicit refusal
+  now wins regardless of ordering.
+
 ### Fixed in 0.1.6
 
 - **A 130-byte match silently corrupted data.** Short match blocks encode
@@ -235,13 +259,14 @@ restored.equals(original) // true — for any input bytes
 | --- | --- |
 | `compress(input: Buffer): Buffer` | Default encoder. Longer match extension, better ratio. |
 | `compressFast(input: Buffer): Buffer` | Speed-oriented encoder, shorter match cap. Used by the middleware. |
-| `decompress(input: Buffer): Buffer` | Decodes output from either encoder above. |
+| `decompress(input, options?)` | Decodes output from either encoder above. `options.maxOutputLength` caps the result, defaulting to 256 MB. |
 | `compressAdvanced(input: Buffer): Buffer` | Applies the substitution transform before compressing. ~5% smaller than `compress` when common keys appear; neutral otherwise. |
-| `decompressAdvanced(input: Buffer): Buffer` | Reverses `compressAdvanced`. Not interchangeable with `decompress`. |
+| `decompressAdvanced(input, options?)` | Reverses `compressAdvanced`. Not interchangeable with `decompress`. |
 | `createCompressorStream(): Transform` | Node `Transform` stream for chunked responses. |
-| `negotiateEncoding(header?: string): 'cx' \| undefined` | Parses `Accept-Encoding`, honouring `q=0` and matching whole tokens only. |
+| `negotiateEncoding(header?: string): 'cx' \| undefined` | Parses `Accept-Encoding` per RFC 9110 — whole tokens, `q=0`, explicit entries outranking `*`. |
+| `acceptsCoding(header, coding): boolean` | The same negotiation for any coding, e.g. `cx-adv`. |
 | `createComprexiaMiddleware(opts?)` | Express middleware. `opts.level` is `'fast'` (default) or `'advanced'`. |
-| `comprexia/web/decoder` | Browser decoder — `decompressBrowser`, `decompressToString`, `ComprexiaDecodeError`. |
+| `comprexia/web/decoder` | Browser decoder — `decompressToString`, `decompressAdvancedToString`, `decompressBrowser`, `decompressAdvancedBrowser`, `ComprexiaDecodeError`. |
 
 `compress` and `compressFast` emit the same stream format, so a single
 `decompress` reads both. `compressAdvanced` does not — it applies a transform
@@ -250,7 +275,10 @@ byte, nothing detects that mismatch for you; pair them correctly.
 
 All decode entry points throw on malformed input rather than returning partial
 or garbage data, so wrap them in `try`/`catch` when the bytes come from
-somewhere you do not control.
+somewhere you do not control. They also bound their output at 256 MB by
+default: five bytes of extended match block expand to 65535, so an unbounded
+decoder turns a small hostile body into gigabytes. Pass
+`{ maxOutputLength: 0 }` to lift the cap, and only for input you produced.
 
 ---
 
@@ -387,8 +415,12 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 ```
 
-The browser decoder handles the `fast` and default formats — the only two you
-should be using. It is dependency-free and mirrors the native decoder's logic.
+The browser decoder is dependency-free and mirrors the native decoder,
+including its validation and its 256 MB output cap. Match the function to the
+coding the server sent: `Content-Encoding: cx` decodes with
+`decompressToString`, and `cx-adv` with `decompressAdvancedToString`. The two
+formats are not interchangeable and nothing in the bytes distinguishes them —
+that is exactly why advanced payloads carry their own coding.
 
 > **Note:** browsers control the real `Accept-Encoding` header on `fetch`/`XHR`
 > and will strip a manual override. In practice you negotiate `cx` with a custom

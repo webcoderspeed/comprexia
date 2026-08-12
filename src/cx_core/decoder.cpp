@@ -14,11 +14,24 @@ namespace cx {
 // hostile: a truncated stream, a zero distance, or a back-reference pointing
 // before the start of the output must raise an error rather than read memory
 // that does not belong to us.
-std::vector<uint8_t> decompress(const uint8_t* data, size_t len) {
+std::vector<uint8_t> decompress(const uint8_t* data, size_t len, size_t max_output) {
   std::vector<uint8_t> out;
-  out.reserve(len * 3);
+  // Only pre-reserve what the limit allows, so a hostile stream cannot make us
+  // allocate gigabytes before the first bounds check runs.
+  size_t initial = len * 3;
+  if (max_output != kNoOutputLimit && initial > max_output) initial = max_output;
+  out.reserve(initial);
 
-  const auto copy_match = [&out](size_t mlen, size_t dist) {
+  // Checked before every append. Without it, five bytes of extended match block
+  // emit 65535 bytes, so 100 kB of crafted input decodes to over a gigabyte.
+  const auto guard_output = [&out, max_output](size_t additional) {
+    if (max_output != kNoOutputLimit && out.size() + additional > max_output) {
+      throw std::runtime_error("comprexia: output exceeds maximum allowed size");
+    }
+  };
+
+  const auto copy_match = [&out, &guard_output](size_t mlen, size_t dist) {
+    guard_output(mlen);
     // dist == 0 would make the back-reference point at the write cursor;
     // dist > out.size() would read before the buffer.
     if (dist == 0 || dist > out.size()) {
@@ -65,6 +78,7 @@ std::vector<uint8_t> decompress(const uint8_t* data, size_t len) {
       if (i + count > len) {
         throw std::runtime_error("comprexia: truncated literal block");
       }
+      guard_output(count);
       out.insert(out.end(), data + i, data + i + count);
       i += count;
 
@@ -81,13 +95,13 @@ std::vector<uint8_t> decompress(const uint8_t* data, size_t len) {
   return out;
 }
 
-std::vector<uint8_t> decompress_json(const uint8_t* data, size_t len) {
-  const auto decompressed = decompress(data, len);
+std::vector<uint8_t> decompress_json(const uint8_t* data, size_t len, size_t max_output) {
+  const auto decompressed = decompress(data, len, max_output);
   return JsonPreprocessor::postprocess(decompressed.data(), decompressed.size());
 }
 
-std::vector<uint8_t> decompress_advanced(const uint8_t* data, size_t len) {
-  const auto decompressed = decompress(data, len);
+std::vector<uint8_t> decompress_advanced(const uint8_t* data, size_t len, size_t max_output) {
+  const auto decompressed = decompress(data, len, max_output);
   return JsonPreprocessor::postprocess(decompressed.data(), decompressed.size());
 }
 

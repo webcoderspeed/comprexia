@@ -46,6 +46,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Every core translation unit, including stream.cpp. Leaving the
+      # streaming encoder out of this build is how it kept a format bug that
+      # made its own decoder reject its output.
       - name: Build roundtrip harness with sanitizers
         run: |
           g++ -std=c++20 -O1 -g \
@@ -55,6 +58,7 @@ jobs:
             src/cx_core/encoder.cpp \
             src/cx_core/decoder.cpp \
             src/cx_core/preprocessor.cpp \
+            src/cx_core/stream.cpp \
             -o roundtrip_fuzz
 
       - name: Run roundtrip fuzzing

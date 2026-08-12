@@ -7,6 +7,7 @@
 
 #include "comprexia/encoder.h"
 #include "comprexia/decoder.h"
+#include "comprexia/stream.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -68,9 +69,9 @@ int failures = 0;
 
 void check(const char* name, const std::vector<uint8_t>& input,
            std::vector<uint8_t> (*encode)(const uint8_t*, size_t),
-           std::vector<uint8_t> (*decode)(const uint8_t*, size_t)) {
+           std::vector<uint8_t> (*decode)(const uint8_t*, size_t, size_t)) {
   const auto compressed = encode(input.data(), input.size());
-  const auto restored = decode(compressed.data(), compressed.size());
+  const auto restored = decode(compressed.data(), compressed.size(), cx::kNoOutputLimit);
   if (restored != input) {
     std::fprintf(stderr, "FAIL %s: %zu bytes in, %zu bytes back\n",
                  name, input.size(), restored.size());
@@ -78,10 +79,47 @@ void check(const char* name, const std::vector<uint8_t>& input,
   }
 }
 
+// The streaming encoder is a second implementation of the same wire format.
+// It went untested for a long time and drifted: it kept emitting the 130-byte
+// match header that the one-shot encoder had already been fixed to avoid, so
+// its own decoder could not read its output. Chunk boundaries are varied
+// because they change where matches and literal runs fall.
+void check_stream(const char* label, const std::vector<uint8_t>& input) {
+  for (size_t chunk : {size_t(1), size_t(7), size_t(64), size_t(4096), input.size() + 1}) {
+    if (chunk == 0) continue;
+
+    cx::EncoderState state{};
+    cx::encoder_init(state);
+
+    std::vector<uint8_t> compressed;
+    for (size_t offset = 0; offset < input.size(); offset += chunk) {
+      const size_t take = std::min(chunk, input.size() - offset);
+      const auto piece = cx::encoder_chunk(state, input.data() + offset, take);
+      compressed.insert(compressed.end(), piece.begin(), piece.end());
+    }
+    const auto tail = cx::encoder_end(state);
+    compressed.insert(compressed.end(), tail.begin(), tail.end());
+
+    try {
+      const auto restored = cx::decompress(compressed.data(), compressed.size());
+      if (restored != input) {
+        std::fprintf(stderr, "FAIL %s (stream, chunk %zu): %zu in, %zu back\n",
+                     label, chunk, input.size(), restored.size());
+        ++failures;
+      }
+    } catch (const std::runtime_error& e) {
+      std::fprintf(stderr, "FAIL %s (stream, chunk %zu): decoder rejected its own "
+                   "encoder's output: %s\n", label, chunk, e.what());
+      ++failures;
+    }
+  }
+}
+
 void check_all(const char* label, const std::vector<uint8_t>& input) {
   check(label, input, cx::compress, cx::decompress);
   check(label, input, cx::compress_fast, cx::decompress);
   check(label, input, cx::compress_advanced, cx::decompress_advanced);
+  check_stream(label, input);
 }
 
 // The decoder must reject hostile streams by throwing, never by reading past

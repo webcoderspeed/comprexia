@@ -1,4 +1,5 @@
 #include "comprexia/encoder.h"
+#include "block_format.h"
 #include "preprocessor.h"
 
 #include <algorithm>
@@ -13,19 +14,10 @@
 namespace cx {
 namespace {
 
+// This encoder requires 4-byte matches even though the format allows 3: a
+// 3-byte match costs 3 bytes to encode and saves nothing.
 constexpr size_t kMinMatch = 4;
-constexpr size_t kMaxDistance = 65535;
-
-// A short match block stores len-3 in seven bits, so len 130 would encode as
-// 0x80|127 == 0xFF — the extended-match marker. v0.1 emitted exactly that and
-// the decoder misread it, silently corrupting any payload containing a
-// 130-byte repeat. Short blocks now stop one below that boundary, which keeps
-// 0xFF unambiguous. Streams written by older versions still decode; streams
-// written by this one are readable by older decoders.
-constexpr size_t kMaxShortMatch = 129;
-
-// The match window is 16-bit, so extended lengths cannot exceed it either.
-constexpr size_t kMaxExtendedMatch = 65535;
+constexpr size_t kMaxDistance = block::kMaxDistance;
 
 inline uint32_t load32(const uint8_t* p) {
   uint32_t v;
@@ -122,14 +114,10 @@ class MatchFinder {
   std::vector<uint32_t> table_;
 };
 
-void push16(std::vector<uint8_t>& out, size_t value) {
-  out.push_back(static_cast<uint8_t>(value & 0xFF));
-  out.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
-}
-
 // Shared body for both encoders. `max_match` bounds how far a match is
 // extended; `allow_extended` enables the five-byte block that covers repeats
-// too long for a short header.
+// too long for a short header. Block bytes are written by block_format.h so
+// this encoder and the streaming one cannot disagree about the wire format.
 std::vector<uint8_t> compress_core(const uint8_t* data, size_t len,
                                    size_t max_match, bool allow_extended) {
   std::vector<uint8_t> out;
@@ -139,46 +127,20 @@ std::vector<uint8_t> compress_core(const uint8_t* data, size_t len,
   size_t literal_start = 0;
   size_t i = 0;
 
-  const auto emit_literals = [&](size_t end) {
-    while (literal_start < end) {
-      const size_t take = std::min(end - literal_start, size_t(127));
-      out.push_back(static_cast<uint8_t>(take));
-      out.insert(out.end(), data + literal_start, data + literal_start + take);
-      literal_start += take;
-    }
-  };
-
   while (i + kMinMatch <= len) {
     size_t dist = 0;
-    size_t matched = finder.Find(data, i, len, max_match, dist);
+    const size_t matched = finder.Find(data, i, len, max_match, dist);
     if (matched == 0) {
       ++i;
       continue;
     }
 
-    emit_literals(i);
-
-    if (matched > kMaxShortMatch) {
-      if (allow_extended) {
-        matched = std::min(matched, kMaxExtendedMatch);
-        out.push_back(0xFF);
-        push16(out, matched);
-        push16(out, dist);
-      } else {
-        matched = kMaxShortMatch;
-        out.push_back(static_cast<uint8_t>(0x80 | (matched - 3)));
-        push16(out, dist);
-      }
-    } else {
-      out.push_back(static_cast<uint8_t>(0x80 | (matched - 3)));
-      push16(out, dist);
-    }
-
-    i += matched;
+    block::emit_literals(out, data, literal_start, i);
+    i += block::emit_match(out, matched, dist, allow_extended);
     literal_start = i;
   }
 
-  emit_literals(len);
+  block::emit_literals(out, data, literal_start, len);
   return out;
 }
 
