@@ -1,254 +1,116 @@
 #include "preprocessor.h"
-#include <cctype>
-#include <string>
-#include <algorithm>
-#include <unordered_map>
+#include <cstring>
 
 namespace cx {
+namespace {
+
+// Quoted forms, so one token replaces the key *and* its quotes: 4 bytes -> 1.
+// Order is part of the format — appending is safe, reordering is not.
+const char* const kInterned[] = {
+  "\"id\"",        "\"name\"",  "\"title\"",   "\"description\"",
+  "\"type\"",      "\"value\"", "\"created\"", "\"updated\"",
+  "\"timestamp\"", "\"date\"",  "\"time\"",    "\"user\"",
+  "\"author\"",    "\"email\"", "\"url\"",     "\"link\"",
+};
+constexpr size_t kInternedCount = sizeof(kInterned) / sizeof(kInterned[0]);
+static_assert(kInternedCount <= 16, "interned tokens must fit in 0xE0..0xEF");
+
+bool matches(const uint8_t* data, size_t len, size_t pos, const char* needle, size_t needle_len) {
+  return pos + needle_len <= len && std::memcmp(data + pos, needle, needle_len) == 0;
+}
+
+}  // namespace
 
 std::vector<uint8_t> JsonPreprocessor::preprocess(const uint8_t* data, size_t len) {
-  std::vector<uint8_t> output;
-  output.reserve(len);
-  
-  // Common JSON strings to intern
-  const char* common_strings[] = {
-    "id", "name", "title", "description", "type", "value",
-    "created", "updated", "timestamp", "date", "time",
-    "user", "author", "email", "url", "link",
-    "status", "error", "message", "result", "data",
-    "true", "false", "null"
-  };
-  
+  std::vector<uint8_t> out;
+  out.reserve(len);
+
   size_t i = 0;
-  bool in_string = false;
-  uint8_t last_char = 0;
-  
   while (i < len) {
-    uint8_t c = data[i];
-    
-    if (in_string) {
-      if (c == '\\' && i + 1 < len && data[i + 1] == '"') {
-        // Escaped quote
-        output.push_back(c);
-        output.push_back(data[i + 1]);
-        i += 2;
-        continue;
-      } else if (c == '"') {
-        // End of string
-        in_string = false;
-        output.push_back(TOK_QUOTE);
-        i++;
-        continue;
+    const uint8_t c = data[i];
+
+    // Every interned literal starts with a quote, so this costs one comparison
+    // on the overwhelming majority of bytes.
+    if (c == '"') {
+      bool replaced = false;
+      for (size_t k = 0; k < kInternedCount; ++k) {
+        const size_t nlen = std::strlen(kInterned[k]);
+        if (matches(data, len, i, kInterned[k], nlen)) {
+          out.push_back(static_cast<uint8_t>(TOK_COMMON_BASE + k));
+          i += nlen;
+          replaced = true;
+          break;
+        }
       }
-      
-      // UTF-8 delta encoding within strings
-      if (last_char != 0 && (c & 0xC0) == 0x80 && (last_char & 0xC0) == 0x80) {
-        // Continuation bytes - use delta encoding
-        output.push_back(c - last_char + 128);
-      } else {
-        output.push_back(c);
-      }
-      last_char = c;
-      i++;
-      
-    } else {
-      // Outside string - handle JSON structure
-      switch (c) {
-        case '{':
-          output.push_back(TOK_OBJECT_START);
-          break;
-        case '}':
-          output.push_back(TOK_OBJECT_END);
-          break;
-        case '[':
-          output.push_back(TOK_ARRAY_START);
-          break;
-        case ']':
-          output.push_back(TOK_ARRAY_END);
-          break;
-        case ':':
-          output.push_back(TOK_COLON);
-          break;
-        case ',':
-          output.push_back(TOK_COMMA);
-          break;
-        case '"':
-          in_string = true;
-          output.push_back(TOK_QUOTE);
-          break;
-        case ' ':
-        case '\t':
-        case '\n':
-        case '\r':
-          // Skip whitespace
-          break;
-        default:
-          // Check for true/false/null
-          if (i + 3 < len && 
-              data[i] == 't' && data[i + 1] == 'r' && 
-              data[i + 2] == 'u' && data[i + 3] == 'e') {
-            output.push_back(TOK_TRUE);
-            i += 3;
-          } else if (i + 4 < len && 
-                     data[i] == 'f' && data[i + 1] == 'a' && 
-                     data[i + 2] == 'l' && data[i + 3] == 's' && 
-                     data[i + 4] == 'e') {
-            output.push_back(TOK_FALSE);
-            i += 4;
-          } else if (i + 3 < len && 
-                     data[i] == 'n' && data[i + 1] == 'u' && 
-                     data[i + 2] == 'l' && data[i + 3] == 'l') {
-            output.push_back(TOK_NULL);
-            i += 3;
-          } else {
-            output.push_back(c);
-          }
-          break;
-      }
-      i++;
+      if (replaced) continue;
+    } else if (c == 't' && matches(data, len, i, "true", 4)) {
+      out.push_back(TOK_TRUE);
+      i += 4;
+      continue;
+    } else if (c == 'f' && matches(data, len, i, "false", 5)) {
+      out.push_back(TOK_FALSE);
+      i += 5;
+      continue;
+    } else if (c == 'n' && matches(data, len, i, "null", 4)) {
+      out.push_back(TOK_NULL);
+      i += 4;
+      continue;
     }
+
+    // A literal byte that could be read back as a token has to be escaped.
+    // This is what keeps multi-byte UTF-8 — whose lead bytes start at 0xE0 —
+    // from being decoded as an interned key.
+    if (c >= ESCAPE_THRESHOLD) {
+      out.push_back(TOK_ESCAPE);
+    }
+    out.push_back(c);
+    ++i;
   }
-  
-  // Replace common strings between quotes with compact tokens
-  intern_common_tokens(output, data, len);
-  return output;
+
+  return out;
 }
 
 std::vector<uint8_t> JsonPreprocessor::postprocess(const uint8_t* data, size_t len) {
-  std::vector<uint8_t> output;
-  output.reserve(len * 2); // May expand due to structural tokens
-  
+  std::vector<uint8_t> out;
+  out.reserve(len + len / 4);
+
+  const auto append = [&out](const char* s) {
+    out.insert(out.end(), s, s + std::strlen(s));
+  };
+
   size_t i = 0;
   while (i < len) {
-    uint8_t c = data[i];
-    
-    if (c >= 0xF0) {
-      // Structural token - expand to actual JSON
-      switch (static_cast<JsonToken>(c)) {
-        case TOK_OBJECT_START: output.push_back('{'); break;
-        case TOK_OBJECT_END:   output.push_back('}'); break;
-        case TOK_ARRAY_START:  output.push_back('['); break;
-        case TOK_ARRAY_END:    output.push_back(']'); break;
-        case TOK_COLON:        output.push_back(':'); break;
-        case TOK_COMMA:        output.push_back(','); break;
-        case TOK_QUOTE:        output.push_back('"'); break;
-        case TOK_TRUE:         
-          output.push_back('t'); output.push_back('r'); 
-          output.push_back('u'); output.push_back('e'); 
-          break;
-        case TOK_FALSE:
-          output.push_back('f'); output.push_back('a');
-          output.push_back('l'); output.push_back('s');
-          output.push_back('e');
-          break;
-        case TOK_NULL:
-          output.push_back('n'); output.push_back('u');
-          output.push_back('l'); output.push_back('l');
-          break;
-        default:
-          output.push_back(c);
-          break;
-      }
-    } else if (c >= JsonPreprocessor::TOK_COMMON_BASE && c < JsonPreprocessor::TOK_COMMON_BASE + JsonPreprocessor::TOK_COMMON_MAX) {
-      // Expand interned common strings
-      static const char* common_strings_post[] = {
-        "id", "name", "title", "description", "type", "value",
-        "created", "updated", "timestamp", "date", "time",
-        "user", "author", "email", "url", "link"
-      };
-      size_t idx = static_cast<size_t>(c - JsonPreprocessor::TOK_COMMON_BASE);
-      if (idx < (sizeof(common_strings_post)/sizeof(common_strings_post[0]))) {
-        const char* s = common_strings_post[idx];
-        while (*s) { output.push_back(static_cast<uint8_t>(*s)); ++s; }
+    const uint8_t c = data[i];
+
+    if (c == TOK_ESCAPE) {
+      // A trailing escape can only come from a corrupt stream. Emitting it
+      // literally keeps this function total; structurally invalid input is
+      // already rejected by the decoder that runs before it.
+      if (i + 1 < len) {
+        out.push_back(data[i + 1]);
+        i += 2;
       } else {
-        output.push_back(c);
-      }
-    } else if (c >= 128 && c < 192) {
-      // Delta encoded UTF-8 continuation byte
-      if (i > 0) {
-        uint8_t decoded = data[i - 1] + (c - 128);
-        output.push_back(decoded);
-      } else {
-        output.push_back(c);
-      }
-    } else {
-      output.push_back(c);
-    }
-    i++;
-  }
-  
-  return output;
-}
-
-void Utf8Transformer::delta_encode(std::vector<uint8_t>& output, 
-                                 const uint8_t* data, size_t len) {
-  if (len == 0) return;
-  
-  output.push_back(data[0]); // First byte as-is
-  
-  for (size_t i = 1; i < len; i++) {
-    if ((data[i] & 0xC0) == 0x80 && (data[i - 1] & 0xC0) == 0x80) {
-      // UTF-8 continuation bytes - delta encode
-      int8_t delta = data[i] - data[i - 1];
-      output.push_back(static_cast<uint8_t>(delta + 128));
-    } else {
-      output.push_back(data[i]);
-    }
-  }
-}
-
-void Utf8Transformer::case_fold(std::vector<uint8_t>& output,
-                               const uint8_t* data, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    uint8_t c = data[i];
-    if (c >= 'A' && c <= 'Z') {
-      output.push_back(c + 32); // to lowercase
-    } else {
-      output.push_back(c);
-    }
-  }
-}
-
-void JsonPreprocessor::intern_common_tokens(std::vector<uint8_t>& output,
-                                           const uint8_t* /*data*/, size_t /*len*/) {
-  static const char* common_strings_map[] = {
-    "id", "name", "title", "description", "type", "value",
-    "created", "updated", "timestamp", "date", "time",
-    "user", "author", "email", "url", "link"
-  };
-  std::vector<uint8_t> transformed;
-  transformed.reserve(output.size());
-  size_t i = 0;
-  while (i < output.size()) {
-    uint8_t c = output[i];
-    if (c == static_cast<uint8_t>(JsonToken::TOK_QUOTE)) {
-      transformed.push_back(c);
-      ++i;
-      size_t start = i;
-      while (i < output.size() && output[i] != static_cast<uint8_t>(JsonToken::TOK_QUOTE)) {
+        out.push_back(c);
         ++i;
       }
-      size_t end = i;
-      std::string s(reinterpret_cast<const char*>(&output[start]), end - start);
-      int idx = -1;
-      for (int k = 0; k < static_cast<int>(JsonPreprocessor::TOK_COMMON_MAX) && k < static_cast<int>(sizeof(common_strings_map)/sizeof(common_strings_map[0])); ++k) {
-        if (s == common_strings_map[k]) { idx = k; break; }
-      }
-      if (idx >= 0) {
-        transformed.push_back(static_cast<uint8_t>(JsonPreprocessor::TOK_COMMON_BASE + idx));
-      } else {
-        transformed.insert(transformed.end(), output.begin() + start, output.begin() + end);
-      }
-      if (i < output.size()) {
-        transformed.push_back(output[i]); // closing quote token
-        ++i;
-      }
-    } else {
-      transformed.push_back(c);
-      ++i;
+      continue;
     }
+
+    if (c >= TOK_COMMON_BASE && c < TOK_COMMON_BASE + kInternedCount) {
+      append(kInterned[c - TOK_COMMON_BASE]);
+    } else if (c == TOK_TRUE) {
+      append("true");
+    } else if (c == TOK_FALSE) {
+      append("false");
+    } else if (c == TOK_NULL) {
+      append("null");
+    } else {
+      out.push_back(c);
+    }
+    ++i;
   }
-  output.swap(transformed);
+
+  return out;
 }
 
-} // namespace cx
+}  // namespace cx

@@ -2,15 +2,15 @@
 // Built with ASan/UBSan in CI: any OOB read/write or UB in the
 // encoder/decoder fails the build even if output happens to match.
 //
-// Covers compress/compress_fast -> decompress. The `advanced`
-// preprocessing pipeline is excluded until its transforms are
-// byte-exact reversible (tracked in docs/DESIGN.md).
+// Covers every public encode path, including `advanced`, and a malformed-input
+// corpus that the decoder must reject without reading out of bounds.
 
 #include "comprexia/encoder.h"
 #include "comprexia/decoder.h"
 
 #include <cstdint>
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -53,12 +53,24 @@ std::vector<uint8_t> unicode_payload() {
   return {s.begin(), s.end()};
 }
 
+// Inputs built specifically to break the substitution transform: bytes that
+// collide with the token range, a stray escape byte, and truncated keywords.
+std::vector<uint8_t> adversarial_tokens() {
+  std::vector<uint8_t> v;
+  for (int b = 0xE0; b <= 0xFF; ++b) v.push_back(static_cast<uint8_t>(b));
+  const std::string s = "\"id\"\"name\"truefalsenulltru fals nul \"id";
+  v.insert(v.end(), s.begin(), s.end());
+  for (int b = 0xFF; b >= 0xE0; --b) v.push_back(static_cast<uint8_t>(b));
+  return v;
+}
+
 int failures = 0;
 
 void check(const char* name, const std::vector<uint8_t>& input,
-           std::vector<uint8_t> (*encode)(const uint8_t*, size_t)) {
-  auto compressed = encode(input.data(), input.size());
-  auto restored = cx::decompress(compressed.data(), compressed.size());
+           std::vector<uint8_t> (*encode)(const uint8_t*, size_t),
+           std::vector<uint8_t> (*decode)(const uint8_t*, size_t)) {
+  const auto compressed = encode(input.data(), input.size());
+  const auto restored = decode(compressed.data(), compressed.size());
   if (restored != input) {
     std::fprintf(stderr, "FAIL %s: %zu bytes in, %zu bytes back\n",
                  name, input.size(), restored.size());
@@ -66,40 +78,75 @@ void check(const char* name, const std::vector<uint8_t>& input,
   }
 }
 
+void check_all(const char* label, const std::vector<uint8_t>& input) {
+  check(label, input, cx::compress, cx::decompress);
+  check(label, input, cx::compress_fast, cx::decompress);
+  check(label, input, cx::compress_advanced, cx::decompress_advanced);
+}
+
+// The decoder must reject hostile streams by throwing, never by reading past
+// the end of its input or before the start of its output.
+void check_rejects(const char* name, const std::vector<uint8_t>& stream) {
+  try {
+    const auto out = cx::decompress(stream.data(), stream.size());
+    std::fprintf(stderr, "FAIL %s: accepted malformed stream, produced %zu bytes\n",
+                 name, out.size());
+    ++failures;
+  } catch (const std::runtime_error&) {
+    // expected
+  }
+}
+
 }  // namespace
 
 int main() {
-  check("empty", {}, cx::compress);
-  check("empty fast", {}, cx::compress_fast);
-
-  auto uni = unicode_payload();
-  check("unicode", uni, cx::compress);
-  check("unicode fast", uni, cx::compress_fast);
+  check_all("empty", {});
+  check_all("unicode", unicode_payload());
+  check_all("adversarial tokens", adversarial_tokens());
 
   for (size_t records : {0u, 1u, 50u, 3000u}) {
-    auto json = repetitive_json(records);
-    check("json", json, cx::compress);
-    check("json fast", json, cx::compress_fast);
+    check_all("json", repetitive_json(records));
+  }
+
+  // Every single byte value, alone — catches off-by-one escaping.
+  for (int b = 0; b <= 0xFF; ++b) {
+    check_all("single byte", {static_cast<uint8_t>(b)});
   }
 
   for (int round = 0; round < 200; ++round) {
-    size_t len = static_cast<size_t>(next_rand() % 8192);
-    auto data = random_bytes(len);
-    check("random", data, cx::compress);
-    check("random fast", data, cx::compress_fast);
+    const size_t len = static_cast<size_t>(next_rand() % 8192);
+    const auto data = random_bytes(len);
+    check_all("random", data);
 
     // Bias toward repetition so match blocks are exercised heavily.
     if (len > 16) {
       std::vector<uint8_t> rep;
       rep.reserve(len * 4);
       for (int k = 0; k < 4; ++k) rep.insert(rep.end(), data.begin(), data.end());
-      check("repeated", rep, cx::compress);
-      check("repeated fast", rep, cx::compress_fast);
+      check_all("repeated", rep);
+    }
+  }
+
+  // Malformed streams. Each one targets a specific unchecked field in v0.1.
+  check_rejects("match with no output to reference", {0x85, 0xFF, 0xFF});
+  check_rejects("zero distance", {0x85, 0x00, 0x00});
+  check_rejects("truncated match header", {0x85, 0x01});
+  check_rejects("truncated extended match", {0xFF, 0x10, 0x00, 0x01});
+  check_rejects("literal run past end", {0x40, 0x01, 0x02});
+  check_rejects("distance beyond output", {0x01, 0x41, 0x85, 0x10, 0x00});
+
+  // Random bytes are usually malformed; they must throw or decode, never crash.
+  for (int round = 0; round < 2000; ++round) {
+    const auto junk = random_bytes(static_cast<size_t>(next_rand() % 64));
+    try {
+      cx::decompress(junk.data(), junk.size());
+    } catch (const std::runtime_error&) {
+      // expected for most inputs
     }
   }
 
   if (failures) {
-    std::fprintf(stderr, "%d roundtrip failure(s)\n", failures);
+    std::fprintf(stderr, "%d failure(s)\n", failures);
     return 1;
   }
   std::puts("all roundtrips ok");

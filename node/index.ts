@@ -25,9 +25,29 @@ export function decompressAdvanced(input: Buffer): Buffer {
   return addon.decompressAdvanced(input)
 }
 
+/**
+ * Parses an Accept-Encoding header and reports whether `cx` is acceptable.
+ *
+ * A substring test is not enough: it matches any future token that merely
+ * contains those letters, and it ignores `;q=0`, which is how a client says a
+ * coding is explicitly *not* acceptable.
+ */
 export function negotiateEncoding(header?: string): 'cx' | undefined {
   if (!header) return undefined
-  return header.includes('cx') ? 'cx' : undefined
+
+  for (const part of header.split(',')) {
+    const [rawToken, ...params] = part.trim().split(';')
+    const token = rawToken.trim().toLowerCase()
+    if (token !== 'cx' && token !== '*') continue
+
+    const q = params
+      .map((p) => p.trim().toLowerCase())
+      .find((p) => p.startsWith('q='))
+    if (q && Number(q.slice(2)) === 0) continue
+
+    return 'cx'
+  }
+  return undefined
 }
 
 export function createCompressorStream(): Transform {
@@ -68,6 +88,9 @@ export function createComprexiaMiddleware(opts?: { level?: 'fast' | 'advanced' }
           const compressedSize = out.length
           const ratio = compressedSize / originalSize
           res.setHeader('Content-Encoding', 'cx')
+          // Without Vary, a shared cache can hand a cx-encoded body to a
+          // client that never asked for one and cannot decode it.
+          res.setHeader('Vary', 'Accept-Encoding')
           res.setHeader('X-Compression-Ratio', ratio.toFixed(3))
           res.setHeader('X-Original-Size', String(originalSize))
           res.setHeader('X-Compressed-Size', String(compressedSize))

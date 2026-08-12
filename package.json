@@ -19,7 +19,7 @@
     "build:release": "cmake-js compile --CDCMAKE_BUILD_TYPE=Release",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "compile": "cmake-js compile",
-    "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js",
+    "test": "node test/node/roundtrip.test.js && node test/node/stream.test.js && node test/node/defects.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "tsc -p tsconfig.json",

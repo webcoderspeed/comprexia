@@ -1,1 +1,5 @@
-export { decompressBrowser, decompressToString } from '../../node/web/decoder'
+export {
+  decompressBrowser,
+  decompressToString,
+  ComprexiaDecodeError,
+} from '../../node/web/decoder'

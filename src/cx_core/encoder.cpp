@@ -140,29 +140,17 @@ std::vector<uint8_t> compress(const uint8_t* data, size_t len) {
   return out;
 }
 
-// Compression with JSON-aware preprocessing
+// Compression with the substitution transform applied first.
 std::vector<uint8_t> compress_json(const uint8_t* data, size_t len) {
-  auto preprocessed = JsonPreprocessor::preprocess(data, len);
+  const auto preprocessed = JsonPreprocessor::preprocess(data, len);
   return compress(preprocessed.data(), preprocessed.size());
 }
 
-// Compression with UTF-8 optimization  
-std::vector<uint8_t> compress_utf8(const uint8_t* data, size_t len) {
-  std::vector<uint8_t> preprocessed;
-  Utf8Transformer::delta_encode(preprocessed, data, len);
-  return compress(preprocessed.data(), preprocessed.size());
-}
-
-// Advanced compression with all optimizations
+// Advanced mode is the same pipeline. v0.1 chained a second UTF-8 delta pass
+// on top, which was not invertible and corrupted every non-ASCII payload; the
+// transform now runs exactly once.
 std::vector<uint8_t> compress_advanced(const uint8_t* data, size_t len) {
-  // First JSON preprocessing
-  auto json_processed = JsonPreprocessor::preprocess(data, len);
-  
-  // Then UTF-8 optimization
-  std::vector<uint8_t> fully_processed;
-  Utf8Transformer::delta_encode(fully_processed, json_processed.data(), json_processed.size());
-  
-  return compress(fully_processed.data(), fully_processed.size());
+  return compress_json(data, len);
 }
 
 // Ultrafast compression variant

@@ -43,18 +43,19 @@ measurement of nothing. It has been replaced.
 
 What is genuinely here today:
 
-- A **correct** fast codec. Arbitrary bytes — UTF-8, Devanagari, emoji, binary —
-  round-trip byte-exactly through `compress`/`compressFast` → `decompress`,
-  fuzzed under AddressSanitizer and UBSan on every commit.
+- A **correct** codec on every path. Arbitrary bytes — UTF-8, Devanagari, emoji,
+  binary, every value 0x00–0xFF — round-trip byte-exactly through all three
+  encoders, fuzzed under AddressSanitizer and UBSan on every commit.
+- A **hardened decoder**. Malformed streams raise a catchable error instead of
+  reading out of bounds, in both the native and browser decoders.
 - **Fast decompression on small payloads**: 439 MB/s on a 1.5 kB response versus
   gzip's 93 MB/s. This is the one axis where the design currently pays off.
 - Working **Express middleware**, **Node streams**, and a **browser decoder**
   small enough to inline.
 
-What is not here: a competitive compression ratio, competitive encode speed, or
-a working `advanced` mode. See [Known defects](#known-defects) — they are
-documented rather than hidden, and [docs/DESIGN.md](docs/DESIGN.md) is the plan
-for fixing them properly.
+What is not here: a competitive compression ratio or competitive encode speed.
+See [Known limitations](#known-limitations) — they are documented rather than
+hidden, and [docs/DESIGN.md](docs/DESIGN.md) is the plan for fixing them.
 
 Use this today if you want to read, learn from, or contribute to a compression
 codec. Do not use it to serve production traffic yet.
@@ -65,7 +66,7 @@ codec. Do not use it to serve production traffic yet.
 
 - [Honest status](#honest-status)
 - [Benchmarks](#benchmarks)
-- [Known defects](#known-defects)
+- [Known limitations](#known-limitations)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [API reference](#api-reference)
@@ -141,29 +142,43 @@ fixing them is what [docs/DESIGN.md](docs/DESIGN.md) describes.
 
 ---
 
-## Known defects
+## Known limitations
 
-These are reproduced by tests and documented deliberately. Do not discover them
-in production.
-
-**`compressAdvanced` / `decompressAdvanced` corrupt non-ASCII data.** Do not use
-them. Three independent bugs: the interned-token range `0xE0–0xF9` collides with
-UTF-8 lead bytes, so Devanagari decodes as English key names; the UTF-8 delta
-transform encodes against the previous original byte but decodes against the
-previous encoded byte, so accented characters and emoji corrupt; and the JSON
-string scanner only handles `\"`, so a string ending in an escaped backslash
-desynchronizes the parser. The `fast` and default paths are unaffected and
-correct.
+Honest boundaries of the current release. Each is a limitation of scope, not a
+correctness bug — the correctness bugs that used to live here are fixed and
+locked down by [`test/node/defects.test.js`](test/node/defects.test.js).
 
 **No prebuilt binaries.** `npm install` compiles C++ on the consumer's machine,
 so anyone without CMake and a C++20 toolchain cannot install the package at all.
+This is the single biggest barrier to adoption and the top roadmap item.
 
-**The middleware does not set `Vary: Accept-Encoding`.** A shared cache or CDN
-can store a `cx`-encoded response and serve it to a client that cannot decode
-it. Set the header yourself until this is fixed.
+**No container framing.** The stream carries no magic number, version, or
+checksum, so corruption is undetectable and the format cannot evolve without
+breaking deployed decoders. Fixed by the v2 container.
 
-**`negotiateEncoding` matches loosely.** It substring-matches `cx`, so any
-future encoding token containing those characters would false-positive.
+**Streaming does not match across chunk boundaries.** `createCompressorStream`
+restarts its match search for each chunk, so repeated structure *between*
+messages is not exploited. Correct, but it leaves ratio on the table for event
+streams — exactly the workload streaming exists for.
+
+**The ratio is not competitive.** See [Benchmarks](#benchmarks). This is the
+honest state of a hand-written LZ with no entropy coding stage.
+
+### Fixed in 0.1.3
+
+- **Advanced mode corrupted all non-ASCII data.** Three separate bugs — a token
+  range colliding with UTF-8 lead bytes, a delta transform that was not
+  invertible, and a JSON string scanner that mishandled escaped backslashes.
+  The transform was rebuilt to be byte-exact and escape-safe; it no longer
+  parses JSON at all, which is why it can be fuzzed against arbitrary bytes.
+- **The decoder read out of bounds on crafted streams.** A back-reference
+  distance larger than the output produced a buffer underflow — reachable from
+  any untrusted response body. Every field is now validated, and both the native
+  and browser decoders raise a catchable error instead.
+- **The middleware omitted `Vary: Accept-Encoding`**, letting a shared cache
+  serve a `cx` body to a client that cannot decode it.
+- **`negotiateEncoding` substring-matched `cx`**, so `cxfuture` was a false
+  positive and `cx;q=0` — an explicit refusal — was treated as support.
 
 ---
 
@@ -204,16 +219,21 @@ restored.equals(original) // true — for any input bytes
 | `compress(input: Buffer): Buffer` | Default encoder. Longer match extension, better ratio. |
 | `compressFast(input: Buffer): Buffer` | Speed-oriented encoder, shorter match cap. Used by the middleware. |
 | `decompress(input: Buffer): Buffer` | Decodes output from either encoder above. |
-| `compressAdvanced(input: Buffer): Buffer` | ⚠️ **Broken for non-ASCII.** See [Known defects](#known-defects). |
-| `decompressAdvanced(input: Buffer): Buffer` | ⚠️ **Broken for non-ASCII.** |
+| `compressAdvanced(input: Buffer): Buffer` | Applies the substitution transform before compressing. ~5% smaller than `compress` when common keys appear; neutral otherwise. |
+| `decompressAdvanced(input: Buffer): Buffer` | Reverses `compressAdvanced`. Not interchangeable with `decompress`. |
 | `createCompressorStream(): Transform` | Node `Transform` stream for chunked responses. |
-| `negotiateEncoding(header?: string): 'cx' \| undefined` | Returns `'cx'` when the client advertises support. |
+| `negotiateEncoding(header?: string): 'cx' \| undefined` | Parses `Accept-Encoding`, honouring `q=0` and matching whole tokens only. |
 | `createComprexiaMiddleware(opts?)` | Express middleware. `opts.level` is `'fast'` (default) or `'advanced'`. |
-| `comprexia/web/decoder` | Browser decoder — `decompressBrowser`, `decompressToString`. |
+| `comprexia/web/decoder` | Browser decoder — `decompressBrowser`, `decompressToString`, `ComprexiaDecodeError`. |
 
 `compress` and `compressFast` emit the same stream format, so a single
-`decompress` reads both. There is no header, no version byte, and no checksum —
-a limitation the v2 format fixes.
+`decompress` reads both. `compressAdvanced` does not — it applies a transform
+that only `decompressAdvanced` reverses. Because the format carries no version
+byte, nothing detects that mismatch for you; pair them correctly.
+
+All decode entry points throw on malformed input rather than returning partial
+or garbage data, so wrap them in `try`/`catch` when the bytes come from
+somewhere you do not control.
 
 ---
 
@@ -245,9 +265,9 @@ When the client sends `Accept-Encoding: cx`, the response carries:
 | `X-Original-Size` | Bytes before compression |
 | `X-Compressed-Size` | Bytes on the wire |
 
-Add `Vary: Accept-Encoding` yourself — see [Known defects](#known-defects).
-Clients that do not advertise `cx` fall through to the original `res.json`, so
-existing gzip middleware keeps working untouched.
+`Vary: Accept-Encoding` is set automatically, so shared caches key the response
+correctly. Clients that do not advertise `cx` fall through to the original
+`res.json`, leaving existing gzip middleware untouched.
 
 ### Fastify
 
@@ -324,9 +344,10 @@ app.get('/events', (req, res) => {
 })
 ```
 
-The encoder keeps its match window across chunks, so repeated structure between
-messages still compresses. Always clear timers on `close` — the example in
-earlier docs leaked an interval per connection.
+Each chunk is matched independently — repeated structure *between* messages is
+not yet exploited, so streaming trades ratio for incrementality. See
+[Known limitations](#known-limitations). Always clear timers on `close`; the
+example in earlier docs leaked an interval per connection.
 
 ### Browser decoding
 
