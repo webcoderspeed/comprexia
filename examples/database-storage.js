@@ -18,7 +18,7 @@ class ComprexiaDatabaseOptimizer {
     const recordBuffer = Buffer.from(JSON.stringify(record))
     
     // Use standard compression
-    let compressed = lib.compress(recordBuffer)
+    const compressed = lib.compress(recordBuffer)
 
     const compressedSize = compressed.length
     const ratio = compressedSize / originalSize

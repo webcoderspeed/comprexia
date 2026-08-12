@@ -34,7 +34,7 @@ class ComprexiaFileCompressor {
       const content = fs.readFileSync(inputPath)
       
       // Use standard compression for all file types
-      let compressed = lib.compress(content)
+      const compressed = lib.compress(content)
       console.log('   Using Comprexia compression')
 
       // Write compressed file
