@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.3](https://github.com/webcoderspeed/comprexia/compare/v0.1.2...v0.1.3) (2026-08-12)
+
+### 🐛 Bug Fixes
+
+* harden decoder and repair the advanced transform ([60eb2e3](https://github.com/webcoderspeed/comprexia/commit/60eb2e3a16322171897692f97493f30ae98c526f))
+
 ## [0.1.2](https://github.com/webcoderspeed/comprexia/compare/v0.1.1...v0.1.2) (2026-08-12)
 
 ### 🐛 Bug Fixes
