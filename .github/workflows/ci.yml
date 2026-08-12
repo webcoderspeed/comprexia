@@ -84,11 +84,18 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # npm ci compiles the native addon (install hook) and the TypeScript
-      # output (prepare hook). CMake and a C++20 toolchain are preinstalled
-      # on all GitHub-hosted runners.
-      - name: Install & build
-        run: npm ci
+      # --ignore-scripts skips install hooks for the benchmark-only codec
+      # devDeps (lz4 has no Windows prebuild and fails node-gyp there), then
+      # our own addon and TypeScript output are built explicitly. CMake and a
+      # C++20 toolchain are preinstalled on all GitHub-hosted runners.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build native addon
+        run: npm run build:release
+
+      - name: Build TypeScript
+        run: npm run build
 
       - name: Run tests
         run: npm test
