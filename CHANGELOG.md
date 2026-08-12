@@ -3,6 +3,12 @@
 All notable changes to **comprexia** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.1.4](https://github.com/webcoderspeed/comprexia/compare/v0.1.3...v0.1.4) (2026-08-12)
+
+### 🐛 Bug Fixes
+
+* **build:** make the published package actually installable ([b2dba5e](https://github.com/webcoderspeed/comprexia/commit/b2dba5eaac4b851ebf2143df1a151a54c7f14444))
+
 ## [0.1.3](https://github.com/webcoderspeed/comprexia/compare/v0.1.2...v0.1.3) (2026-08-12)
 
 ### 🐛 Bug Fixes
