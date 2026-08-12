@@ -63,11 +63,19 @@ within ~1.5× of LZ4. Sizing the table to the input rather than fixing it at 64 
 entries mattered most for small payloads, where clearing a 256 kB table had cost
 more than the compression itself: 81 → 660 MB/s on a 1.5 kB response.
 
+**Update (0.1.9):** the wildcopy decoder landed too — matches copy in fixed
+8-byte steps into a buffer carrying a slack margin, so the inner loop drops its
+per-byte condition. Decode improved 1.2–1.8× (216 → 380 MB/s on the API list),
+which is real but well short of the ~4× that was hoped for. The lesson is that
+the remaining cost is **per-block dispatch, not copying**: at ratio 0.2 the API
+payload contains roughly twelve thousand matches averaging fifteen bytes, so the
+decoder spends its time branching between block types rather than moving bytes.
+Bigger decode wins need a format with fewer, fatter blocks — which is what the
+v2 token layout is for — not a faster copy.
+
 What remains is **ratio**, and it needs an entropy coding stage — Huffman or
 FSE over literals and lengths. That is the difference between LZ4-class output
 and gzip-class output, and no amount of match-finder tuning substitutes for it.
-Decode also still trails LZ4 badly (216 vs 965 MB/s) because matches are copied
-through `std::vector`'s append path instead of an over-allocated wildcopy.
 
 ## Competitive landscape — why v2 targets dictionaries
 
