@@ -171,7 +171,7 @@ piece is Huffman or FSE over literals and lengths, not more match-finder tuning.
 **Decompression trails LZ4 by ~4×.** Matches are copied through `std::vector`'s
 append path rather than the over-allocated wildcopy LZ4 uses.
 
-### Fixed in 0.1.7
+### Fixed in 0.1.8
 
 - **The streaming encoder produced output its own decoder rejected.** It was a
   second, independent implementation of the block format and never received the
