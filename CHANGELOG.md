@@ -1,0 +1,18 @@
+# Changelog
+
+All notable changes to **comprexia** are documented in this file.
+This project adheres to [Semantic Versioning](https://semver.org).
+
+## [0.1.2](https://github.com/webcoderspeed/comprexia/compare/v0.1.1...v0.1.2) (2026-08-12)
+
+### 🐛 Bug Fixes
+
+* **build:** add missing standard includes for gcc ([acbb589](https://github.com/webcoderspeed/comprexia/commit/acbb58950a7f51e5d7a45ebf2ebdc7c3fb021b37))
+* **encoder:** replace misaligned uint32 casts with memcpy loads ([a1a31f2](https://github.com/webcoderspeed/comprexia/commit/a1a31f2de302528d72cf420e8576bd058e562fa0))
+* restore package entry points broken by dist layout ([004810a](https://github.com/webcoderspeed/comprexia/commit/004810a49a884e1ccfcde00e205b92f85d26e95a))
+
+### 📚 Documentation
+
+* add cx2 design doc, security policy, and code of conduct ([a8262ce](https://github.com/webcoderspeed/comprexia/commit/a8262ce0a50ecd00e2ab648ee1d5bba9fd5baa60))
+* expand README to detailed 2000+ words; chore: fix exports and web decoder docs ([8f5a52a](https://github.com/webcoderspeed/comprexia/commit/8f5a52a2bdf4a1e7b15265e68c61fe5ad9e96239))
+* rewrite README around measured benchmarks ([2a760b9](https://github.com/webcoderspeed/comprexia/commit/2a760b9feadae3110e16d39d2f82f965d68168c9))
