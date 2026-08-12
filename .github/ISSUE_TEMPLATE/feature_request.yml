@@ -1,0 +1,51 @@
+name: ✨ Feature Request
+description: Suggest an idea or improvement
+title: '[Feature]: '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case, not just the solution.
+      placeholder: My API payloads are dominated by repeated keys that…
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like Comprexia to do, with an API sketch if you have one.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you've tried or evaluated (gzip/brotli/zstd/lz4, custom transforms…).
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Compression format / algorithm
+        - Performance (speed or ratio)
+        - Node.js API
+        - Middleware / framework integrations
+        - Streaming
+        - Browser / WASM
+        - Tooling (CLI, benchmarks)
+        - Other
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true

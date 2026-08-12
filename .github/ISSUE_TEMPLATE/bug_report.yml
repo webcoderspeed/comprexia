@@ -1,0 +1,94 @@
+name: 🐛 Bug Report
+description: Report something that behaves incorrectly
+title: '[Bug]: '
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. For a compression
+        library the single most useful thing is the exact input bytes that
+        trigger the problem — please include a payload whenever you can.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+      placeholder: decompress(compress(input)) returned different bytes for…
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The smallest code snippet that shows the problem.
+      render: typescript
+      placeholder: |
+        const { compress, decompress } = require('@comprexia/cx')
+
+        const input = Buffer.from('…')
+        // …
+    validations:
+      required: true
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Input payload
+      description: >-
+        The input that triggers the bug, if shareable — inline for small
+        payloads, base64 or a gist link for binary ones. Redact anything
+        sensitive; a synthetic payload that still reproduces is perfect.
+      render: text
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Comprexia?
+      multiple: true
+      options:
+        - Core codec (compress / decompress)
+        - Fast encoder (compressFast)
+        - Advanced mode (compressAdvanced / decompressAdvanced)
+        - Express middleware
+        - Streaming (createCompressorStream)
+        - Browser decoder (web/decoder)
+        - Native build / install (cmake-js, node-gyp, compilers)
+        - TypeScript types
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Comprexia version
+      placeholder: 0.1.1
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, OS/architecture, compiler if build-related.
+      placeholder: Node 22, macOS 15 arm64, clang 17
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or stack trace
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true

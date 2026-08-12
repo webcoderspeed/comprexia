@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & Discussions
+    url: https://github.com/webcoderspeed/comprexia/discussions
+    about: Ask questions, share benchmarks, or discuss ideas before opening an issue.
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/webcoderspeed/comprexia/security/advisories/new
+    about: Report security issues privately — never in a public issue.

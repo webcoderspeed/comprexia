@@ -1,0 +1,62 @@
+version: 2
+
+updates:
+  # ── npm dependencies ─────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 10
+    # Group non-major updates so the queue stays reviewable.
+    groups:
+      eslint-and-plugins:
+        patterns:
+          - 'eslint*'
+          - '@eslint/*'
+          - '@typescript-eslint/*'
+      typescript:
+        patterns:
+          - 'typescript'
+          - '@types/*'
+      native-toolchain:
+        patterns:
+          - 'cmake-js'
+          - 'node-addon-api'
+      benchmark-codecs:
+        patterns:
+          - 'lz4'
+          - 'zstd-codec'
+    labels:
+      - 'dependencies'
+      - 'automated'
+    commit-message:
+      prefix: 'chore'
+      prefix-development: 'chore'
+      include: scope
+    # ABI-relevant majors change how the addon builds — review by hand.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'node-addon-api'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'cmake-js'
+        update-types: ['version-update:semver-major']
+
+  # ── GitHub Actions ────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels:
+      - 'github-actions'
+      - 'automated'
+    commit-message:
+      prefix: 'ci'
+      include: scope

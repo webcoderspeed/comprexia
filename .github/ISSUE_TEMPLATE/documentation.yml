@@ -1,0 +1,27 @@
+name: 📚 Documentation
+description: Report missing, unclear, or incorrect documentation
+title: '[Docs]: '
+labels: ['documentation', 'needs-triage']
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Where is the problem?
+      description: Link or path to the doc section (README heading, code comment, example file).
+      placeholder: README.md → "Frontend Decode"
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+      description: Quote the current text if it's incorrect, or describe what you expected to find.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Optional — proposed wording or structure.

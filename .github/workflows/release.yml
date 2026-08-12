@@ -1,0 +1,50 @@
+name: Release (manual fallback)
+
+# The primary release path is the `release` job inside ci.yml.
+# This workflow is a manual escape hatch — use it to cut a release without
+# pushing a new commit (e.g. after configuring the npm trusted publisher, or
+# recovering from a release that failed mid-flight).
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false # never cancel an in-flight release — queue instead
+
+jobs:
+  release:
+    name: Semantic Release (manual)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships npm 10.x.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install & build
+        run: npm ci
+
+      # No NPM_TOKEN — authentication is OIDC trusted publishing.
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        run: npx --yes -p semantic-release@25 -p @semantic-release/changelog@6 -p @semantic-release/git@10 -p conventional-changelog-conventionalcommits@8 semantic-release

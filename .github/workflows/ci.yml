@@ -1,32 +1,180 @@
-name: ci
+name: CI
+
 on:
   push:
-    branches: [ main ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main, develop]
+
+# PRs: cancel superseded runs when new commits arrive.
+# Default-branch pushes: never cancel — the release job lives in this run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  quality:
+    name: Quality (lint · typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # --ignore-scripts skips the native compile; lint/typecheck only need sources.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+  # The codec parses untrusted bytes, so every roundtrip path runs under
+  # AddressSanitizer + UBSan. Any OOB access or UB fails the job even when
+  # the output happens to look correct.
+  sanitizers:
+    name: Sanitizers (ASan · UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build roundtrip harness with sanitizers
+        run: |
+          g++ -std=c++20 -O1 -g \
+            -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -Iinclude -Isrc/cx_core \
+            test/cpp/roundtrip_fuzz.cpp \
+            src/cx_core/encoder.cpp \
+            src/cx_core/decoder.cpp \
+            src/cx_core/preprocessor.cpp \
+            -o roundtrip_fuzz
+
+      - name: Run roundtrip fuzzing
+        run: ./roundtrip_fuzz
+
   build-test:
+    name: Build & test (${{ matrix.os }} · Node ${{ matrix.node }})
+    needs: quality
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [18, 20]
+        os: [ubuntu-latest]
+        node: ['18', '20', '22']
+        include:
+          - os: macos-latest
+            node: '22'
+          - os: windows-latest
+            node: '22'
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: Install CMake
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y cmake
-      - name: Install CMake (macOS)
-        if: matrix.os == 'macos-latest'
-        run: brew install cmake
-      - name: Install CMake (Windows)
-        if: matrix.os == 'windows-latest'
-        run: choco install -y cmake --version=3.27.9
-      - run: npm ci
-      - run: npm run compile
-      - run: npm run build
-      - run: npm test
+          cache: npm
+
+      # npm ci compiles the native addon (install hook) and the TypeScript
+      # output (prepare hook). CMake and a C++20 toolchain are preinstalled
+      # on all GitHub-hosted runners.
+      - name: Install & build
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Pack the publishable tarball
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
+        run: mkdir -p pack && npm pack --pack-destination ./pack
+
+      - name: Upload package tarball
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-tarball
+          path: pack/*.tgz
+          retention-days: 3
+
+  benchmarks:
+    name: Benchmark smoke
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install & build
+        run: npm ci
+
+      - name: Run benchmarks
+        run: npm run bench | tee bench-output.txt
+
+      - name: Publish benchmark summary
+        run: |
+          {
+            echo '## Benchmark results'
+            echo '```'
+            cat bench-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    needs: [build-test, sanitizers, benchmarks]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write # push release tag + chore(release) commit
+      issues: write # comment on released issues
+      pull-requests: write # comment on released PRs
+      id-token: write # npm trusted publishing (OIDC) + provenance attestation
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships npm 10.x.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      # semantic-release refuses to publish when local HEAD is behind origin.
+      - name: Sync with remote
+        run: git fetch origin && git reset --hard origin/${{ github.ref_name }}
+
+      - name: Install & build
+        run: npm ci
+
+      # No NPM_TOKEN: publishing authenticates via OIDC trusted publishing.
+      # Requires a trusted publisher for `@comprexia/cx` on npmjs.com pointing
+      # at this repository and workflow file.
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        run: npx --yes -p semantic-release@25 -p @semantic-release/changelog@6 -p @semantic-release/git@10 -p conventional-changelog-conventionalcommits@8 semantic-release
